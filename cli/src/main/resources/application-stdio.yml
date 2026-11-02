@@ -1,0 +1,13 @@
+spring:
+  main:
+    web-application-type: none
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: mainframe-modernization-toolkit
+        version: 0.1.0
+        type: SYNC
+        stdio: true
+  flyway:
+    enabled: false

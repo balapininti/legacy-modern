@@ -83,12 +83,13 @@ public class DiscoverJobConfig {
     private void parseAll(JdbcTemplate jdbc, PlatformTransactionManager tm, RunContext ctx, NodeStore nodes) throws InterruptedException {
         CopybookLibrary lib = new CopybookLibrary();
         Map<String, Long> ids = new HashMap<>();
-        jdbc.query("SELECT id, path, name, type, format, normalized_text FROM member WHERE normalized_text IS NOT NULL", rs -> {
+        jdbc.query("SELECT id, path, name, type, format, normalized_text, classify_reason FROM member WHERE normalized_text IS NOT NULL", rs -> {
             ids.put(rs.getString(2), rs.getLong(1));
             // A COPY target is defined by being referenced, not by how it reads: a copybook of only paragraphs has no
             // signature, so anything that could be text stays eligible, and a real program never shadows a copybook.
-            if (!List.of("cobol", "jcl", "proc", "bms", "ddl", "csd").contains(rs.getString(4))) {
-                lib.add(rs.getString(3), rs.getString(2), MemberProcessor.cobolLines(rs.getString(6), rs.getString(5)));
+            // Empty files are excluded outright: CardDemo's scripts/markers/* share copybook names and hold nothing.
+            if (!List.of("cobol", "jcl", "proc", "bms", "ddl", "csd").contains(rs.getString(4)) && !"empty".equals(rs.getString(7))) {
+                lib.add(rs.getString(3), rs.getString(2), MemberProcessor.cobolLines(rs.getString(6), rs.getString(5)), "copybook".equals(rs.getString(4)));
             }
         });
         MemberProcessor proc = new MemberProcessor(List.of(new ProLeapCobolParser()), ctx.options.memberTimeout(), lib, ids, new FactWriter(jdbc, nodes));
@@ -107,6 +108,7 @@ public class DiscoverJobConfig {
             List<Long> revealed = jdbc.queryForList("""
                     UPDATE member m SET type = 'copybook', parse_status = 'pending', classify_reason = 'referenced by COPY'
                     WHERE m.type IN ('unknown', 'control', 'assembler', 'pli', 'easytrieve', 'rexx', 'clist') AND m.normalized_text IS NOT NULL
+                      AND m.classify_reason <> 'empty' AND NOT EXISTS (SELECT 1 FROM member c WHERE c.type = 'copybook' AND upper(c.name) = upper(m.name))
                       AND EXISTS (SELECT 1 FROM copy_use u WHERE upper(u.copybook_name) = upper(m.name))
                     RETURNING m.id""", Long.class);
             runPhase(pool, revealed, jdbc, memberTx, proc, nodes, ctx, done, pending.size() + revealed.size());

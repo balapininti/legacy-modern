@@ -1,0 +1,19 @@
+spring:
+  main:
+    web-application-type: servlet
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: mainframe-modernization-toolkit
+        version: 0.1.0
+        protocol: STREAMABLE
+        type: SYNC
+        stdio: false
+server:
+  port: ${TOOLKIT_MCP_PORT:8081}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus

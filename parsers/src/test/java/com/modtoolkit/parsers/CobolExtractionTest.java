@@ -348,6 +348,14 @@ class CobolExtractionTest {
     }
 
     @Test
+    void aRealCopybookWinsOverAnUnclassifiedMemberWithTheSameName() {
+        lib.add("SAME", "s/SAME", lines("       01 FROM-MAYBE PIC X.\n"), false);
+        lib.add("SAME", "some/much/longer/path/SAME.cpy", lines("       01 FROM-REAL PIC X.\n"), true);
+        ExpandedSource e = CopybookResolver.expand("MAIN", lines(HEAD + "           COPY SAME.\n       PROCEDURE DIVISION.\n           GOBACK.\n"), lib, false);
+        assertThat(new ProLeapCobolParser().parse(e).programs.get(0).dataItems).extracting(DataItem::name).contains("FROM-REAL").doesNotContain("FROM-MAYBE");
+    }
+
+    @Test
     void copyInsideExecSqlIncludeExpands() {
         copy("DCLT1", """
            EXEC SQL DECLARE T1 TABLE (C1 CHAR(1) NOT NULL, C2 INT) END-EXEC.

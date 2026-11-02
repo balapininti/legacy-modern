@@ -17,6 +17,10 @@ spring:
       initialize-schema: never
   flyway:
     enabled: true
+  ai:
+    mcp:
+      server:
+        enabled: false
 logging:
   level:
     root: WARN

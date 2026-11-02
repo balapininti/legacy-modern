@@ -1,0 +1,298 @@
+package com.modtoolkit.cli;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.client.McpClient;
+import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
+import io.modelcontextprotocol.client.transport.ServerParameters;
+import io.modelcontextprotocol.client.transport.StdioClientTransport;
+import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper;
+import io.modelcontextprotocol.spec.McpSchema;
+import java.io.File;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+/** Drives the real jar over both transports with the MCP Java client, on the real CardDemo facts. */
+@TestMethodOrder(MethodOrderer.MethodName.class)
+class McpContractIT {
+    static final Path REPO = Path.of("..").toAbsolutePath().normalize();
+    static final Path JAR = REPO.resolve("cli/target/toolkit.jar");
+    static final Path CORPUS = REPO.resolve(".cache/corpora/carddemo");
+    static final ObjectMapper OM = new ObjectMapper();
+    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+
+    static Process http;
+    static int port;
+    static String devToken, smeToken;
+    static McpSyncClient httpClient, stdioClient;
+
+    static Map<String, String> env() {
+        Map<String, String> e = new HashMap<>();
+        e.put("TOOLKIT_DB_URL", pg.getJdbcUrl());
+        e.put("TOOLKIT_DB_USER", pg.getUsername());
+        e.put("TOOLKIT_DB_PASSWORD", pg.getPassword());
+        return e;
+    }
+
+    static String run(String... args) throws Exception {
+        List<String> cmd = new ArrayList<>(List.of(java(), "-jar", JAR.toString()));
+        cmd.addAll(List.of(args));
+        ProcessBuilder b = new ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.appendTo(REPO.resolve("cli/target/it-commands.log").toFile()));
+        b.environment().putAll(env());
+        Process p = b.start();
+        String out = new String(p.getInputStream().readAllBytes());
+        assertThat(p.waitFor()).as(String.join(" ", args)).isZero();
+        return out.strip();
+    }
+
+    static String java() {
+        return Path.of(System.getProperty("java.home"), "bin", "java").toString();
+    }
+
+    @BeforeAll
+    static void start() throws Exception {
+        assumeTrue(Files.isDirectory(CORPUS.resolve("app/cbl")), "run scripts/fetch-corpora.sh first");
+        assumeTrue(Files.exists(JAR), "package the jar first");
+        pg.start();
+        run("discover", "--root", CORPUS.toString(), "--threads", "8");
+        run("index");
+        devToken = lastLine(run("token", "--user", "dev1"));
+        smeToken = lastLine(run("token", "--user", "sme1", "--role", "sme-reviewer"));
+        try (ServerSocket s = new ServerSocket(0)) {
+            port = s.getLocalPort();
+        }
+        ProcessBuilder b = new ProcessBuilder(java(), "-jar", JAR.toString(), "mcp", "http").redirectErrorStream(true).redirectOutput(new File(REPO.resolve("cli/target/mcp-it.log").toString()));
+        b.environment().putAll(env());
+        b.environment().put("TOOLKIT_MCP_PORT", String.valueOf(port));
+        http = b.start();
+        HttpClient c = HttpClient.newHttpClient();
+        for (int i = 0; i < 120; i++) {
+            try {
+                if (c.send(HttpRequest.newBuilder(URI.create(base() + "/actuator/health")).build(), HttpResponse.BodyHandlers.ofString()).statusCode() == 200) break;
+            } catch (java.io.IOException e) {
+                Thread.sleep(500);
+            }
+        }
+        httpClient = httpClient(devToken);
+        ServerParameters sp = ServerParameters.builder(java()).args("-jar", JAR.toString(), "mcp", "stdio").env(env()).build();
+        stdioClient = McpClient.sync(new StdioClientTransport(sp, new JacksonMcpJsonMapper(OM))).requestTimeout(Duration.ofSeconds(60)).initializationTimeout(Duration.ofSeconds(120)).build();
+        stdioClient.initialize();
+    }
+
+    static McpSyncClient httpClient(String token) {
+        var t = HttpClientStreamableHttpTransport.builder(base()).endpoint("/mcp").customizeRequest(r -> r.header("Authorization", "Bearer " + token)).build();
+        McpSyncClient c = McpClient.sync(t).requestTimeout(Duration.ofSeconds(60)).build();
+        c.initialize();
+        return c;
+    }
+
+    static String base() {
+        return "http://localhost:" + port;
+    }
+
+    static String lastLine(String s) {
+        return s.substring(s.lastIndexOf('\n') + 1);
+    }
+
+    @AfterAll
+    static void stop() {
+        if (httpClient != null) httpClient.closeGracefully();
+        if (stdioClient != null) stdioClient.closeGracefully();
+        if (http != null) http.destroy();
+    }
+
+    static McpSyncClient client(String transport) {
+        return transport.equals("http") ? httpClient : stdioClient;
+    }
+
+    static String text(McpSchema.CallToolResult r) {
+        return ((McpSchema.TextContent) r.content().get(0)).text();
+    }
+
+    static JsonNode ok(McpSyncClient c, String tool, Map<String, Object> args) throws Exception {
+        McpSchema.CallToolResult r = c.callTool(new McpSchema.CallToolRequest(tool, args));
+        assertThat(r.isError()).as(tool + " -> " + text(r)).isFalse();
+        return OM.readTree(text(r));
+    }
+
+    static JsonNode error(McpSyncClient c, String tool, Map<String, Object> args) throws Exception {
+        McpSchema.CallToolResult r = c.callTool(new McpSchema.CallToolRequest(tool, args));
+        assertThat(r.isError()).as(tool + " should fail: " + text(r)).isTrue();
+        JsonNode e = OM.readTree(text(r)).get("error");
+        assertThat(e.fieldNames()).toIterable().containsExactlyInAnyOrder("code", "message", "hint");
+        assertThat(text(r)).doesNotContain("Exception").doesNotContain("\tat ").doesNotContain("SELECT ");
+        return e;
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http", "stdio"})
+    void a_listsEveryToolWithASchema(String t) {
+        List<McpSchema.Tool> tools = client(t).listTools().tools();
+        Set<String> names = tools.stream().map(McpSchema.Tool::name).collect(Collectors.toSet());
+        assertThat(names).containsAll(ContractTools.EXPECTED);
+        for (McpSchema.Tool x : tools) {
+            assertThat(x.description()).isNotBlank();
+            assertThat(x.inputSchema().type()).isEqualTo("object");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http", "stdio"})
+    void b_everyM2ToolAnswersWithProvenance(String t) throws Exception {
+        McpSyncClient c = client(t);
+        JsonNode inv = ok(c, "inventory_summary", Map.of()).get("items").get(0);
+        assertThat(inv.get("programs").asInt()).isEqualTo(44);
+
+        JsonNode who = ok(c, "who_calls", Map.of("program", "CBSTM03B", "depth", 1));
+        assertThat(who.get("total_items").asInt()).isEqualTo(13);
+        assertThat(who.get("items").get(0).get("member").asText()).isEqualTo("app/cbl/CBSTM03A.CBL");
+        assertThat(who.get("items").get(0).get("line").asInt()).isEqualTo(351);
+        assertThat(who.get("items").get(0).get("edge_type").asText()).isEqualTo("CALLS");
+
+        JsonNode from = ok(c, "calls_from", Map.of("program", "CBSTM03A"));
+        assertThat(from.get("items").findValues("to_program").stream().map(JsonNode::asText).toList()).contains("CBSTM03B");
+
+        JsonNode src = ok(c, "get_source", Map.of("member", "app/cbl/CBSTM03A.CBL", "line_start", 351, "line_end", 351));
+        assertThat(src.get("items").get(0).get("text").asText()).contains("CALL 'CBSTM03B'");
+        assertThat(src.get("items").get(0).get("original_line").asInt()).isEqualTo(351);
+
+        JsonNode tu = ok(c, "table_usage", Map.of("table", "transaction_type"));
+        assertThat(tu.get("items").findValues("stmt_type").stream().map(JsonNode::asText).toList()).contains("SELECT", "UPDATE", "INSERT", "DELETE");
+        assertThat(tu.get("items").get(0).has("line_start")).isTrue();
+
+        JsonNode s = ok(c, "search", Map.of("query", "CDEMO-MENU-OPT-PGMNAME", "limit", 5));
+        JsonNode hit = s.get("items").get(0);
+        assertThat(hit.get("member").asText()).isNotBlank();
+        assertThat(hit.get("line_start").asInt()).isPositive();
+        assertThat(hit.has("status")).isTrue();
+        assertThat(hit.get("snippet").asText()).containsIgnoringCase("CDEMO-MENU-OPT");
+
+        JsonNode partial = ok(c, "search", Map.of("query", "MENU-OPT-PGM", "limit", 5));
+        assertThat(partial.get("items")).as("partial identifier through pg_trgm").isNotEmpty();
+
+        JsonNode prog = ok(c, "get_program", Map.of("name", "cotrtupc", "include", List.of("tables", "summary", "callers")));
+        assertThat(prog.get("items").get(0).get("value").get("member").asText()).endsWith("COTRTUPC.cbl");
+        Map<String, JsonNode> parts = new HashMap<>();
+        prog.get("items").forEach(i -> parts.put(i.get("part").asText(), i.get("value")));
+        assertThat(parts.get("tables")).isNotEmpty();
+        assertThat(parts.get("summary").get("status").asText()).isEqualTo("not_available");
+
+        JsonNode cb = ok(c, "get_copybook", Map.of("name", "CVACT01Y"));
+        JsonNode first = cb.get("items").get(0);
+        assertThat(first.get("member").asText()).endsWith("CVACT01Y.cpy");
+        assertThat(first.get("line").asInt()).isPositive();
+        assertThat(first.has("offset") && first.has("length")).isTrue();
+    }
+
+    /** Review Focus 5 over the wire. */
+    @ParameterizedTest
+    @ValueSource(strings = {"http", "stdio"})
+    void c_paginationIsCappedAndLossless(String t) throws Exception {
+        McpSyncClient c = client(t);
+        List<String> expected = Files.readAllLines(CORPUS.resolve("app/cbl/COACTUPC.cbl"), java.nio.charset.StandardCharsets.ISO_8859_1);
+        List<String> got = new ArrayList<>();
+        String cursor = null;
+        int pages = 0;
+        do {
+            Map<String, Object> a = new HashMap<>(Map.of("member", "app/cbl/COACTUPC.cbl"));
+            if (cursor != null) a.put("cursor", cursor);
+            McpSchema.CallToolResult r = c.callTool(new McpSchema.CallToolRequest("get_source", a));
+            String body = text(r);
+            assertThat(body.length()).isLessThanOrEqualTo(20_000);
+            JsonNode n = OM.readTree(body);
+            n.get("items").forEach(i -> got.add(i.get("text").asText()));
+            cursor = n.get("next_cursor").isNull() ? null : n.get("next_cursor").asText();
+            pages++;
+        } while (cursor != null);
+        assertThat(pages).isGreaterThan(1);
+        assertThat(got).hasSameSizeAs(expected);
+        for (int i = 0; i < got.size(); i++) assertThat(got.get(i)).isEqualTo(expected.get(i).stripTrailing());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http", "stdio"})
+    void d_errorsAreStructured(String t) throws Exception {
+        McpSyncClient c = client(t);
+        JsonNode nf = error(c, "get_program", Map.of("name", "COSGNOOC"));
+        assertThat(nf.get("code").asText()).isEqualTo("NOT_FOUND");
+        assertThat(nf.get("hint").asText()).contains("COSGN00C");
+        assertThat(error(c, "get_program", Map.of()).get("code").asText()).isEqualTo("BAD_ARGUMENT");
+        assertThat(error(c, "get_source", Map.of("member", "app/cbl/CBSTM03A.CBL", "line_start", 9999999)).get("code").asText()).isEqualTo("OUT_OF_RANGE");
+        assertThat(error(c, "get_source", Map.of("member", "app/cbl/CBSTM03A.CBL", "cursor", "garbage!")).get("code").asText()).isEqualTo("BAD_CURSOR");
+        assertThat(error(c, "who_calls", Map.of("program", "X' OR 1=1 --")).get("code").asText()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void e_unauthenticatedAndRevokedAreRejected() throws Exception {
+        HttpClient c = HttpClient.newHttpClient();
+        String init = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}";
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base() + "/mcp")).header("Content-Type", "application/json").header("Accept", "application/json, text/event-stream").POST(HttpRequest.BodyPublishers.ofString(init));
+        assertThat(c.send(b.build(), HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(401);
+        HttpRequest.Builder bad = HttpRequest.newBuilder(URI.create(base() + "/mcp")).header("Authorization", "Bearer tk_nope").header("Content-Type", "application/json").header("Accept", "application/json, text/event-stream").POST(HttpRequest.BodyPublishers.ofString(init));
+        HttpResponse<String> r = c.send(bad.build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(r.statusCode()).isEqualTo(401);
+        assertThat(r.body()).contains("UNAUTHENTICATED");
+        assertThat(c.send(HttpRequest.newBuilder(URI.create(base() + "/actuator/health")).build(), HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void f_roleIsEnforcedAndEveryCallAudited() throws Exception {
+        McpSyncClient sme = httpClient(smeToken);
+        try {
+            assertThat(error(sme, "inventory_summary", Map.of()).get("code").asText()).isEqualTo("FORBIDDEN");
+        } finally {
+            sme.closeGracefully();
+        }
+        ok(httpClient, "who_calls", Map.of("program", "CBSTM03B"));
+        try (Connection con = DriverManager.getConnection(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword()); Statement s = con.createStatement()) {
+            try (ResultSet r = s.executeQuery("SELECT outcome, params_hash FROM audit_log WHERE \"user\"='sme1' AND tool='inventory_summary' ORDER BY id DESC LIMIT 1")) {
+                assertThat(r.next()).isTrue();
+                assertThat(r.getString(1)).isEqualTo("FORBIDDEN");
+                assertThat(r.getString(2)).hasSize(64);
+            }
+            try (ResultSet r = s.executeQuery("SELECT latency_ms FROM audit_log WHERE \"user\"='dev1' AND tool='who_calls' ORDER BY id DESC LIMIT 1")) {
+                assertThat(r.next()).isTrue();
+                assertThat(r.getLong(1)).isGreaterThanOrEqualTo(0);
+            }
+            try (ResultSet r = s.executeQuery("SELECT count(*) FROM audit_log WHERE \"user\" LIKE '%@stdio'")) {
+                r.next();
+                assertThat(r.getLong(1)).as("stdio calls are audited too").isPositive();
+            }
+        }
+    }
+
+    @Test
+    void g_serverLogHasNoStackTraces() throws Exception {
+        String log = Files.readString(REPO.resolve("cli/target/mcp-it.log"));
+        assertThat(log).doesNotContain("AccessDenied").doesNotContain("already committed");
+    }
+}

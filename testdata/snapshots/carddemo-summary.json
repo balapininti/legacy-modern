@@ -41,17 +41,17 @@
     "bms" : 21,
     "cobol" : 44,
     "control" : 6,
-    "copybook" : 76,
+    "copybook" : 65,
     "csd" : 8,
     "ddl" : 7,
     "jcl" : 56,
     "proc" : 6,
-    "unknown" : 97
+    "unknown" : 108
   },
   "missing_copybooks" : 0,
   "parse_status" : {
-    "inventoried" : 111,
-    "parsed" : 120,
+    "inventoried" : 122,
+    "parsed" : 109,
     "pending_m3" : 98
   },
   "programs" : 44,
