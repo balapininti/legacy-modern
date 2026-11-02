@@ -81,10 +81,7 @@ final class MemberProcessor {
         List<String> lines = Arrays.asList(text.split("\n", -1));
         if (!"fixed".equals(format)) return lines;
         List<String> out = new ArrayList<>(lines.size());
-        for (String l : lines) {
-            String cut = l.length() > 72 ? l.substring(0, 72) : l;
-            out.add(cut.length() <= 6 ? "" : "      " + cut.substring(6).stripTrailing());
-        }
+        for (String l : lines) out.add(com.modtoolkit.parsers.normalize.NormalizedMember.fixedLine(l));
         return out;
     }
 

@@ -13,6 +13,9 @@ public class DiscoveryReports {
     private static final String IN_ESTATE = "EXISTS (SELECT 1 FROM program p WHERE upper(p.program_id) = d.name) "
             + "OR EXISTS (SELECT 1 FROM member m WHERE upper(m.name) = d.name AND m.type IN ('assembler','pli','easytrieve','rexx','clist'))";
 
+    /** The BMS assembler generates the copybook for each mapset, so its absence from the export is expected. */
+    private static final String NOT_SYMBOLIC_MAP = "NOT EXISTS (SELECT 1 FROM bms_map b JOIN member bm ON bm.id = b.member_id WHERE upper(b.mapset) = upper(c.name) OR upper(bm.name) = upper(c.name))";
+
     private final JdbcTemplate jdbc;
 
     public DiscoveryReports(JdbcTemplate jdbc) {
@@ -29,7 +32,8 @@ public class DiscoveryReports {
         r.put("edges_by_type", counts("SELECT type, count(*) FROM graph_edge GROUP BY type ORDER BY type"));
         r.put("static_calls", staticCallResolution());
         r.put("unresolved_dynamic_calls", one("SELECT count(*) FROM unresolved_call"));
-        r.put("missing_copybooks", one("SELECT count(DISTINCT name) FROM missing_copybook"));
+        r.put("missing_copybooks", one("SELECT count(DISTINCT c.name) FROM missing_copybook c WHERE " + NOT_SYMBOLIC_MAP));
+        r.put("symbolic_maps_generated_from_bms", one("SELECT count(DISTINCT c.name) FROM missing_copybook c WHERE NOT (" + NOT_SYMBOLIC_MAP + ")"));
         r.put("missing_procs", one("SELECT count(DISTINCT feature) FROM dialect_feature WHERE feature LIKE 'MISSING PROC %'"));
         r.put("jobs", one("SELECT count(*) FROM jcl_job"));
         r.put("job_steps", one("SELECT count(*) FROM jcl_step"));
@@ -44,7 +48,7 @@ public class DiscoveryReports {
     /** Share of static CALL edges whose target is a program in this estate; subsystem APIs are counted separately. */
     public Map<String, Object> staticCallResolution() {
         String base = "FROM graph_edge e JOIN graph_node d ON d.id = e.dst_id WHERE e.type = 'CALLS' AND e.attrs->>'mode' = 'static'";
-        String system = " AND d.name ~ '^(CBLTDLI|AIBTDLI|AERTDLI|MQ[A-Z0-9]+|CEE[A-Z0-9]+|DSN[A-Z0-9]+|IGZ[A-Z0-9]+|ILBO[A-Z0-9]+|DFH[A-Z0-9]+)$'";
+        String system = " AND d.name ~ '^(CBLTDLI|AIBTDLI|AERTDLI|MQ[A-Z0-9]+|CEE[A-Z0-9]+|DSN[A-Z0-9]+|IGZ[A-Z0-9]+|ILBO[A-Z0-9]+|DFH[A-Z0-9]+|EZA[A-Z0-9]+|C\\$[A-Z0-9]+|CBL_[A-Z0-9_]+|__[A-Z0-9_]+)$'";
         long total = one("SELECT count(*) " + base);
         long sys = one("SELECT count(*) " + base + system);
         long resolved = one("SELECT count(*) " + base + " AND (" + IN_ESTATE + ")");
@@ -83,7 +87,7 @@ public class DiscoveryReports {
     }
 
     public List<Map<String, Object>> missingCopybooks() {
-        return jdbc.queryForList("SELECT DISTINCT c.name, m.path FROM missing_copybook c JOIN member m ON m.id = c.member_id ORDER BY 1, 2");
+        return jdbc.queryForList("SELECT DISTINCT c.name, m.path FROM missing_copybook c JOIN member m ON m.id = c.member_id WHERE " + NOT_SYMBOLIC_MAP + " ORDER BY 1, 2");
     }
 
     /** Programs with no caller, no JCL step and no transaction. A candidate only: scheduler entries are invisible here. */

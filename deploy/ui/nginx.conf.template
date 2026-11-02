@@ -1,0 +1,26 @@
+# The one front door: the web UI, the REST API and the MCP endpoint, all over TLS.
+server {
+  listen 8443 ssl;
+  http2 on;
+  ssl_certificate     /etc/toolkit/tls/tls.crt;
+  ssl_certificate_key /etc/toolkit/tls/tls.key;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  add_header Strict-Transport-Security "max-age=31536000" always;
+  add_header X-Content-Type-Options nosniff always;
+  add_header Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' ${OIDC_ORIGIN}" always;
+  root /usr/share/nginx/html;
+  client_max_body_size 2m;
+
+  location /api/ { proxy_pass http://${API_HOST}; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; proxy_read_timeout 300s; }
+  location /v3/api-docs { proxy_pass http://${API_HOST}; }
+  # MCP streams results: no buffering, and long reads.
+  location /mcp {
+    proxy_pass http://${MCP_HOST};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_buffering off;
+    proxy_read_timeout 3600s;
+  }
+  location / { try_files $uri $uri/ /index.html; }
+}

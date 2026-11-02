@@ -91,6 +91,40 @@ class NormalizeClassifyTest {
         assertThat(type("      * IDENTIFICATION DIVISION.\n       01 A PIC X.\n")).isEqualTo(MemberType.COPYBOOK);
     }
 
+    /** Each is a real file that was misread: a tutorial, a license, a PL/I member, a numbered list. */
+    @Test
+    void documentsAndPliAreNotCobolOrCopybooks() {
+        assertThat(type("# Lab\n\nHere is a program:\n\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. X.\n")).isNotEqualTo(MemberType.COBOL);
+        assertThat(type("Copyright 2020\n\n1. Permission is granted to copy this\n2. Redistribution in any form\n3 Terms\n")).isEqualTo(MemberType.UNKNOWN);
+        assertThat(type(" /* SIST ENDRET */\n DCL 1 A,\n     2 B CHAR(3),\n     2 C CHAR(3);\n X = 1;\n")).isEqualTo(MemberType.PLI);
+        assertThat(type(" %INCLUDE P0014002;\n /* COMMENT */\n W = 1;\n Y = 2;\n")).isEqualTo(MemberType.PLI);
+        assertThat(type("      * CBL DATA,NODYNAM\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. X.\n")).isEqualTo(MemberType.COBOL);
+        assertThat(type(" CBL OPT(2)\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. X.\n")).isEqualTo(MemberType.COBOL);
+    }
+
+    @Test
+    void aStrayNulInLongTextIsStillText() {
+        String pli = " /* SIST ENDRET PROD */\n DCL A CHAR(1);\n".repeat(50);
+        byte[] b = (pli.substring(0, 100) + "\u0000" + pli.substring(100)).getBytes(StandardCharsets.UTF_8);
+        NormalizedMember m = Normalizer.normalize(b, SourceOptions.AUTO);
+        assertThat(m.binary()).isFalse();
+        assertThat(Classifier.classify(m).type()).isEqualTo(MemberType.PLI);
+    }
+
+    @Test
+    void blankAndCommentLinesBeforeTheIdentificationDivisionDoNotHideIt() {
+        assertThat(type("\n\n      * header\n\n000300\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID.\n           X.\n")).isEqualTo(MemberType.COBOL);
+        assertThat(type("      >>SOURCE FORMAT FIXED\n       ID DIVISION.\n       PROGRAM-ID. X.\n")).isEqualTo(MemberType.COBOL);
+    }
+
+    @Test
+    void longLinesDoNotMakeAFixedFormatMemberFree() {
+        String longLine = "      * " + "X".repeat(120) + "\n";
+        String src = longLine.repeat(30) + "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. X.\n";
+        assertThat(norm(src).format()).isEqualTo(NormalizedMember.Format.FIXED);
+        assertThat(type(src)).isEqualTo(MemberType.COBOL);
+    }
+
     /** Review Focus 1. */
     @Test
     void binaryEmptyAndUnrecognizedAreUnknownWithAReasonNotACrash() {

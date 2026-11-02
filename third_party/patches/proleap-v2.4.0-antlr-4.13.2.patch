@@ -372,3 +372,43 @@ index cccb747..905f048 100755
 +		</dependency>
 +	</dependencies>
 +</project>
+diff --git a/src/main/antlr4/io/proleap/cobol/Cobol85.g4 b/src/main/antlr4/io/proleap/cobol/Cobol85.g4
+index b30cb61..f9f838e 100644
+--- a/src/main/antlr4/io/proleap/cobol/Cobol85.g4
++++ b/src/main/antlr4/io/proleap/cobol/Cobol85.g4
+@@ -305,7 +305,7 @@ recordKeyClause
+    ;
+ 
+ alternateRecordKeyClause
+-   : ALTERNATE RECORD KEY? IS? qualifiedDataName passwordClause? (WITH? DUPLICATES)?
++   : ALTERNATE RECORD? KEY? IS? qualifiedDataName passwordClause? (WITH? DUPLICATES)?
+    ;
+ 
+ passwordClause
+@@ -1487,7 +1487,7 @@ exhibitOperand
+ // exit statement
+ 
+ exitStatement
+-   : EXIT PROGRAM?
++   : EXIT (PROGRAM | SECTION | PARAGRAPH | PERFORM CYCLE?)?
+    ;
+ 
+ // generate statement
+@@ -2371,7 +2371,7 @@ subscript
+    ;
+ 
+ argument
+-   : literal | identifier | qualifiedDataName integerLiteral? | indexName integerLiteral? | arithmeticExpression
++   : LEADING | TRAILING | literal | identifier | qualifiedDataName integerLiteral? | indexName integerLiteral? | arithmeticExpression
+    ;
+ 
+ // qualified data name ----------------------------------
+@@ -2566,7 +2566,7 @@ cobolWord
+    | VIRTUAL
+    | WAIT
+    | YEAR | YYYYMMDD | YYYYDDD
+-   | ZERO_FILL
++   | ZERO_FILL | TYPE | STATUS
+    ;
+ 
+ literal

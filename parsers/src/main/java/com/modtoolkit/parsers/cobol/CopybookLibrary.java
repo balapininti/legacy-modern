@@ -16,6 +16,10 @@ public final class CopybookLibrary {
     /** Supplied by the compiler or subsystem, so their absence from an export is not a defect. */
     public static final Set<String> SYSTEM = Set.of("SQLCA", "SQLDA", "DFHAID", "DFHBMSCA", "DFHEIBLK", "DFHCOMMAREA", "DFHATTR", "DFHMSRCA", "DFHTRMPA", "CMQV", "CMQTML", "CMQODV", "CMQMDV", "CMQPMOV", "CMQGMOV", "CMQCD");
 
+    public static boolean isSystem(String upper) {
+        return SYSTEM.contains(upper) || upper.startsWith("CEE") || upper.startsWith("DFH") || upper.startsWith("CMQ");
+    }
+
     private final Map<String, List<Entry>> byName = new HashMap<>();
 
     public void add(String name, String path, List<String> lines) {

@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Runs a toolkit CLI command in the installed stack, for example: ./toolkit doctor
+cd "$(dirname "$0")" || exit 1
+exec docker compose --profile cli run --rm -T cli "$@"

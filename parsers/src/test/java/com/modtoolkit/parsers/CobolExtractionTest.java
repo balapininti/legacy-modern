@@ -151,6 +151,153 @@ class CobolExtractionTest {
         assertThat(p.cancels).extracting(Cancel::target).containsExactly("WS-MOV");
     }
 
+    /** What ProLeap rejects, the fallback takes, flagged, with the same facts in the same places. */
+    @Test
+    void koopaFallbackParsesWhatProLeapRejectsAndSaysSo() {
+        String src = """
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 REC.
+          05 SEARCH PIC X(8).
+          05 AMT PIC S9(7)V99 COMP-3.
+          05 WS-DYN PIC X(8) VALUE 'DYNPGM'.
+          05 TBL OCCURS 3 TIMES.
+             10 ELT PIC X(2).
+       LINKAGE SECTION.
+       01 LS-IN PIC X.
+       PROCEDURE DIVISION USING LS-IN.
+       P1.
+           IF AMT > 0
+              CALL 'STAT1' USING AMT
+           END-IF.
+           CALL WS-DYN.
+           EXEC SQL SELECT C1 INTO :AMT FROM T1 END-EXEC.
+           EXEC CICS LINK PROGRAM('LNK1') END-EXEC.
+           MOVE AMT TO ELT(1).
+           PERFORM P2 THRU P3.
+           GO TO P3.
+       P2.
+           DISPLAY 'X'.
+       P3.
+           GOBACK.
+       P4.
+           DISPLAY 'NEVER'.
+""";
+        ExpandedSource e = CopybookResolver.expand("MAIN", lines(src), lib, false);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ProLeapCobolParser().parse(e)).isInstanceOf(CobolParseException.class);
+        var o = new ResilientParser(List.of(new ProLeapCobolParser(), new KoopaCobolParser()), Duration.ofMinutes(1)).parse(e);
+        assertThat(o.ok()).as(String.valueOf(o.error())).isTrue();
+        assertThat(o.parser()).isEqualTo("koopa");
+        assertThat(o.rejectedBy()).hasSize(1);
+        CobolFacts f = o.facts();
+        assertThat(f.features).contains("FALLBACK PARSER koopa", "EXEC SQL", "EXEC CICS", "COMP-3");
+        ProgramFacts p = f.programs.get(0);
+        assertThat(p.programId).isEqualTo("MAIN");
+        assertThat(p.calls).extracting(Call::target, Call::kind).containsExactlyInAnyOrder(
+                org.assertj.core.groups.Tuple.tuple("STAT1", CallKind.STATIC), org.assertj.core.groups.Tuple.tuple("DYNPGM", CallKind.DYNAMIC_RESOLVED));
+        assertThat(p.calls.stream().filter(c -> c.target().equals("STAT1")).findFirst().orElseThrow().loc().line()).isEqualTo(16);
+        assertThat(p.calls.stream().filter(c -> c.target().equals("STAT1")).findFirst().orElseThrow().using()).containsExactly("AMT");
+        assertThat(p.usingList).containsExactly("LS-IN");
+        assertThat(p.sql).extracting(Sql::tables).containsExactly(List.of("T1"));
+        assertThat(p.cics).extracting(Cics::resourceName).containsExactly("LNK1");
+        assertThat(p.paragraphs).extracting(Para::name).containsExactly("P1", "P2", "P3", "P4");
+        assertThat(p.paragraphs.get(0).start().line()).isEqualTo(14);
+        assertThat(p.performs).extracting(Perform::target, Perform::thru).containsExactly(org.assertj.core.groups.Tuple.tuple("P2", "P3"));
+        assertThat(p.gotos).extracting(GoTo::target).containsExactly("P3");
+        assertThat(p.moves).extracting(Move::from, Move::to).containsExactly(org.assertj.core.groups.Tuple.tuple("AMT", "ELT"));
+        assertThat(p.unreachable).containsExactly("P4");
+        DataItem amt = p.dataItems.stream().filter(d -> "AMT".equals(d.name())).findFirst().orElseThrow();
+        assertThat(amt.usage()).isEqualTo("COMP-3");
+        assertThat(amt.length()).isEqualTo(5);
+        assertThat(amt.offset()).isEqualTo(8);
+    }
+
+    /** Each of these is valid COBOL that a real repository uses and the stock grammar rejected. */
+    @Test
+    void grammarGapsFoundInRealEstates() {
+        ProgramFacts p = one("""
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION ALL INTRINSIC.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT F ASSIGN TO FDD ORGANIZATION IS INDEXED
+               RECORD KEY IS F-KEY
+               ALTERNATE KEY IS F-ALT WITH DUPLICATES.
+       DATA DIVISION.
+       FILE SECTION.
+       FD F.
+       01 F-REC.
+          05 F-KEY PIC X.
+          05 F-ALT PIC X.
+       WORKING-STORAGE SECTION.
+       01 COMMA-DATA.
+          03 Type PIC X.
+          03 Status PIC X.
+       01 WS-T PIC X(9).
+       PROCEDURE DIVISION.
+       S1 SECTION.
+       P1.
+           MOVE FUNCTION TRIM(WS-T, LEADING) TO WS-T.
+           IF WS-T = SPACES
+              EXIT SECTION
+           END-IF.
+           PERFORM UNTIL WS-T = 'X'
+              EXIT PERFORM
+           END-PERFORM.
+           GOBACK.
+""");
+        assertThat(p.dataItems).extracting(DataItem::name).contains("TYPE", "STATUS");
+        assertThat(p.files).extracting(FileFact::name).containsExactly("F");
+        assertThat(p.stops).extracting(Stop::loc).extracting(Loc::line).containsExactly(33);
+    }
+
+    @Test
+    void columnOneCommentsAndLinesOverrunningColumn72() {
+        CobolFacts f = new ProLeapCobolParser().parse(CopybookResolver.expand("MAIN", lines("""
+*  Copyright 2020, a Micro Focus style comment in column one
+/  and a page eject comment
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+       PROCEDURE DIVISION.
+           DISPLAY 'A LITERAL THAT RUNS PAST COLUMN SEVENTY TWO BEFORE IT CLOSES HERE OK'.
+           DISPLAY FUNCTION TRIM('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', TRAILING).
+           GOBACK.
+""").stream().map(com.modtoolkit.parsers.normalize.NormalizedMember::fixedLine).toList(), lib, false));
+        assertThat(f.programs.get(0).stops.get(0).loc().line()).isEqualTo(8);
+        // A real sequence number past column 72 is still cut.
+        assertThat(com.modtoolkit.parsers.normalize.NormalizedMember.fixedLine("000100 MOVE A TO B.                                                     SEQ00001")).isEqualTo("       MOVE A TO B.");
+    }
+
+    @Test
+    void aCopybookMayShareItsNameWithTheProgram() {
+        copy("MAIN", "       01 FROM-COPY PIC X.\n");
+        ExpandedSource e = CopybookResolver.expand("MAIN", lines(HEAD + "           COPY MAIN.\n       PROCEDURE DIVISION.\n           GOBACK.\n"), lib, false);
+        assertThat(e.missing()).isEmpty();
+        assertThat(new ProLeapCobolParser().parse(e).programs.get(0).dataItems).extracting(DataItem::name).contains("FROM-COPY");
+    }
+
+    @Test
+    void figurativeConstantsAndTextAreNotDynamicCallTargets() {
+        ProgramFacts p = one("""
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-PGM PIC X(20) VALUE SPACES.
+       PROCEDURE DIVISION.
+           MOVE 'not a program name' TO WS-PGM.
+           CALL WS-PGM.
+           GOBACK.
+""");
+        assertThat(p.calls).extracting(Call::kind).containsExactly(CallKind.DYNAMIC_UNRESOLVED);
+    }
+
     @Test
     void dispatchTableVariableIsUnresolvedWithCandidates() {
         ProgramFacts p = one("""

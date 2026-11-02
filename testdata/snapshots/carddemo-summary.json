@@ -6,6 +6,7 @@
     "COMP-3" : 25,
     "EXEC CICS" : 25,
     "EXEC SQL" : 8,
+    "FALLBACK PARSER koopa" : 1,
     "IMS" : 7,
     "MQ" : 3,
     "OCCURS DEPENDING ON" : 22,
@@ -16,23 +17,23 @@
     "COPIES" : 357,
     "DECLARES_FILE" : 54,
     "DELETES" : 3,
-    "GETS_QUEUE" : 6,
+    "GETS_QUEUE" : 4,
     "INSERTS" : 3,
     "LINKS" : 1,
-    "MOVES_TO" : 2925,
+    "MOVES_TO" : 2946,
     "PERFORMS" : 1202,
-    "PUTS_QUEUE" : 14,
+    "PUTS_QUEUE" : 10,
     "READS" : 113,
     "RECEIVES_MAP" : 21,
     "REDEFINES" : 208,
     "RUNS_IN" : 344,
     "SELECTS" : 5,
-    "SENDS_MAP" : 21,
+    "SENDS_MAP" : 26,
     "STARTS_TRANSACTION" : 24,
     "UPDATES" : 4,
     "USES_DATASET" : 365,
     "WRITES" : 147,
-    "XCTLS" : 41
+    "XCTLS" : 62
   },
   "job_steps" : 154,
   "jobs" : 56,
@@ -47,13 +48,14 @@
     "assembler" : 8,
     "bms" : 21,
     "cobol" : 44,
-    "control" : 6,
+    "control" : 4,
     "copybook" : 65,
     "csd" : 8,
     "ddl" : 7,
     "jcl" : 56,
+    "pli" : 7,
     "proc" : 6,
-    "unknown" : 108
+    "unknown" : 103
   },
   "missing_copybooks" : 0,
   "missing_procs" : 0,
@@ -68,5 +70,6 @@
     "system_api" : 43,
     "total" : 63
   },
-  "unresolved_dynamic_calls" : 13
+  "symbolic_maps_generated_from_bms" : 0,
+  "unresolved_dynamic_calls" : 4
 }

@@ -1,0 +1,96 @@
+# Same images on-prem, in a cloud account, and air-gapped. Secrets come from .env (see .env.example), never this file.
+name: toolkit
+services:
+  postgres:
+    image: ${TOOLKIT_POSTGRES_IMAGE:-pgvector/pgvector:pg16}
+    pull_policy: ${TOOLKIT_PULL_POLICY:-missing}
+    restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=200"]
+    environment:
+      POSTGRES_DB: toolkit
+      POSTGRES_USER: toolkit
+      POSTGRES_PASSWORD: ${TOOLKIT_DB_PASSWORD:?set TOOLKIT_DB_PASSWORD in .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U toolkit -d toolkit"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  toolkit-api:
+    image: modtoolkit/toolkit:${TOOLKIT_VERSION:-0.1.0-SNAPSHOT}
+    pull_policy: ${TOOLKIT_PULL_POLICY:-missing}
+    restart: unless-stopped
+    command: ["serve"]
+    depends_on: {postgres: {condition: service_healthy}}
+    environment: &toolkit-env
+      TOOLKIT_DB_URL: jdbc:postgresql://postgres:5432/toolkit
+      TOOLKIT_DB_USER: toolkit
+      TOOLKIT_DB_PASSWORD: ${TOOLKIT_DB_PASSWORD}
+      TOOLKIT_CONFIG: /config/toolkit.yaml
+      TOOLKIT_ADMIN_PASSWORD: ${TOOLKIT_ADMIN_PASSWORD:?set TOOLKIT_ADMIN_PASSWORD in .env}
+      TOOLKIT_OIDC_ISSUER: ${TOOLKIT_OIDC_ISSUER:-}
+      TOOLKIT_OIDC_CLIENT: ${TOOLKIT_OIDC_CLIENT:-}
+      TOOLKIT_LLM_KEY: ${TOOLKIT_LLM_KEY:-}
+      TOOLKIT_ZOS_USER: ${TOOLKIT_ZOS_USER:-}
+      TOOLKIT_ZOS_PASS: ${TOOLKIT_ZOS_PASS:-}
+      TOOLKIT_RULES_DIR: ${TOOLKIT_RULES_DIR:-}
+    volumes: &toolkit-volumes
+      - ${TOOLKIT_SOURCE:?set TOOLKIT_SOURCE in .env}:/data/source:ro
+      - ${TOOLKIT_TARGET:-./empty-target}:/data/target
+      - ${TOOLKIT_CONFIG_DIR:-./config}:/config
+      - captures:/data/captures
+    healthcheck: &toolkit-health
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  toolkit-mcp:
+    image: modtoolkit/toolkit:${TOOLKIT_VERSION:-0.1.0-SNAPSHOT}
+    pull_policy: ${TOOLKIT_PULL_POLICY:-missing}
+    restart: unless-stopped
+    command: ["mcp", "http"]
+    depends_on: {postgres: {condition: service_healthy}}
+    environment:
+      <<: *toolkit-env
+      TOOLKIT_ADMIN_PASSWORD: ""
+    volumes: *toolkit-volumes
+    healthcheck:
+      <<: *toolkit-health
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health || exit 1"]
+
+  toolkit-ui:
+    image: modtoolkit/toolkit-ui:${TOOLKIT_VERSION:-0.1.0-SNAPSHOT}
+    pull_policy: ${TOOLKIT_PULL_POLICY:-missing}
+    restart: unless-stopped
+    depends_on: [toolkit-api, toolkit-mcp]
+    ports: ["${TOOLKIT_HTTPS_PORT:-8443}:8443"]
+    environment:
+      API_HOST: toolkit-api:8080
+      MCP_HOST: toolkit-mcp:8081
+      OIDC_ORIGIN: ${TOOLKIT_OIDC_ISSUER:-}
+    volumes: ["${TOOLKIT_TLS_DIR:-./tls}:/etc/toolkit/tls:ro"]
+
+  # Everything else: `./toolkit discover`, `./toolkit doctor`, and so on.
+  cli:
+    profiles: [cli]
+    image: modtoolkit/toolkit:${TOOLKIT_VERSION:-0.1.0-SNAPSHOT}
+    pull_policy: ${TOOLKIT_PULL_POLICY:-missing}
+    depends_on: {postgres: {condition: service_healthy}}
+    working_dir: /config
+    environment: *toolkit-env
+    volumes: *toolkit-volumes
+
+  # Air-gapped chat and embedding models: start with --profile local-llm.
+  ollama:
+    profiles: [local-llm]
+    image: ollama/ollama:0.12.3
+    pull_policy: ${TOOLKIT_PULL_POLICY:-missing}
+    restart: unless-stopped
+    volumes: [ollama:/root/.ollama]
+
+volumes:
+  pgdata: {}
+  captures: {}
+  ollama: {}

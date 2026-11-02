@@ -41,9 +41,8 @@ public final class CopybookResolver {
         r.copies = new ArrayList<>();
         r.missing = new ArrayList<>();
         r.dups = new LinkedHashMap<>();
-        Deque<String> stack = new ArrayDeque<>();
-        stack.push(member.toUpperCase(Locale.ROOT));
-        r.walk(member, lines, List.of(), stack);
+        // Only copybooks go on the stack: a copybook may share its name with the program that copies it.
+        r.walk(member, lines, List.of(), new ArrayDeque<>());
         return new ExpandedSource(member, free, r.out, r.origins, r.copies, r.missing, List.copyOf(r.dups.values()));
     }
 
@@ -107,7 +106,7 @@ public final class CopybookResolver {
         }
         name = name.replaceAll("(?i)\\.(cpy|cbl|cob|copy)$", "");
         String upper = name.toUpperCase(Locale.ROOT);
-        boolean system = CopybookLibrary.SYSTEM.contains(upper);
+        boolean system = CopybookLibrary.isSystem(upper);
         var entry = lib.resolve(name);
         copies.add(new ExpandedSource.CopyUse(name, new Loc(member, line), replacing, system, entry.isPresent(), entry.map(CopybookLibrary.Entry::path).orElse(null)));
         if (entry.isEmpty()) {

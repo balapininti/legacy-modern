@@ -103,7 +103,7 @@ public class DiscoverJobConfig {
             procMembers.put(rs.getString(2), rs.getLong(1));
             if ("proc".equals(rs.getString(4))) procs.putIfAbsent(rs.getString(2).toUpperCase(java.util.Locale.ROOT), new JclParser.ProcBody(rs.getString(2), lines));
         });
-        MemberProcessor proc = new MemberProcessor(List.of(new ProLeapCobolParser()), ctx.options.memberTimeout(), lib, ids, new FactWriter(jdbc, nodes), new StructureWriter(jdbc, nodes), procs, procMembers);
+        MemberProcessor proc = new MemberProcessor(List.of(new ProLeapCobolParser(), new com.modtoolkit.parsers.cobol.KoopaCobolParser()), ctx.options.memberTimeout(), lib, ids, new FactWriter(jdbc, nodes), new StructureWriter(jdbc, nodes), procs, procMembers);
         TransactionTemplate memberTx = new TransactionTemplate(tm);
         // Copybooks first, so a program's copy_use row can point at its copybook row.
         List<Long> pending = jdbc.queryForList("SELECT id FROM member WHERE parse_status = 'pending' ORDER BY (type = 'copybook') DESC, id", Long.class);

@@ -15,6 +15,8 @@ public final class ParserInput {
     private static final Pattern EXEC = Pattern.compile("(?i)(?<![\\w-])EXEC(?:UTE)?\\s+([A-Z]+)\\b");
     private static final Pattern EXEC_ALONE = Pattern.compile("(?i)(?<![\\w-])EXEC(?:UTE)?\\s*$");
     private static final Pattern END_EXEC = Pattern.compile("(?i)END-EXEC");
+    private static final Pattern REPOSITORY = Pattern.compile("(?i)^\\s{6}.\\s*REPOSITORY\\s*\\.");
+    private static final Pattern NEXT_AFTER_REPOSITORY = Pattern.compile("(?i)^\\s{6}.\\s*((INPUT-OUTPUT|FILE|WORKING-STORAGE|LINKAGE|LOCAL-STORAGE)\\s+SECTION|(DATA|PROCEDURE)\\s+DIVISION|SPECIAL-NAMES|FILE-CONTROL)\\b");
     private static final Pattern DEBUG_MODE = Pattern.compile("(?i)WITH\\s+DEBUGGING\\s+MODE");
 
     public record Result(List<String> lines, List<ExecBlock> execs) {}
@@ -28,8 +30,19 @@ public final class ParserInput {
             l.add(toFixedShape(raw, src.free(), debug));
         }
         foldContinuations(l);
+        blankRepository(l);
         List<ExecBlock> execs = collapseExecs(l);
         return new Result(l, execs);
+    }
+
+    /** Enterprise COBOL's REPOSITORY paragraph names classes and functions; it holds no facts and the grammar lacks it. */
+    private static void blankRepository(List<String> l) {
+        for (int i = 0; i < l.size(); i++) {
+            if (!REPOSITORY.matcher(l.get(i)).find()) continue;
+            int j = i;
+            while (j < l.size() && !NEXT_AFTER_REPOSITORY.matcher(l.get(j)).find()) l.set(j++, "");
+            i = j;
+        }
     }
 
     private static boolean comment(String l, boolean free) {

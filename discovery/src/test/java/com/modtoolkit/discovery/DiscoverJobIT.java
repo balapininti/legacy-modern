@@ -185,7 +185,10 @@ class DiscoverJobIT {
 
     @Test
     void badMembersGoToTheReportAndNeverStopTheJob() throws Exception {
-        Files.writeString(root.resolve("BROKEN"), callee().replace("DISPLAY LS-IN.", "MOVE TO TO TO."));
+        // Past ProLeap, but the island parser takes it: parsed, and flagged so nobody mistakes it for a clean parse.
+        Files.writeString(root.resolve("ODD"), callee().replace("CALLEE", "ODD").replace("DISPLAY LS-IN.", "MOVE TO TO TO."));
+        // Past both: a misspelled paragraph in the identification division, from a real estate.
+        Files.writeString(root.resolve("BROKEN"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. BROKEN.\n       AUTHER. CURTIS.\n       PROCEDURE DIVISION.\n           GOBACK.\n");
         Files.write(root.resolve("BIN"), new byte[] {0, 1, 2, 3, 0, 0, 7, 8, 0});
         Files.writeString(root.resolve("EMPTY"), "");
         Files.writeString(root.resolve("README"), "just some words\n");
@@ -193,7 +196,9 @@ class DiscoverJobIT {
         List<Map<String, Object>> f = reports.parseFailures();
         assertThat(f).hasSize(1);
         assertThat(f.get(0)).containsEntry("path", "BROKEN");
-        assertThat((String) f.get(0).get("parse_error")).startsWith("line 8:");
+        assertThat((String) f.get(0).get("parse_error")).startsWith("line 3:");
+        assertThat(jdbc.queryForObject("SELECT parse_status FROM member WHERE name='ODD'", String.class)).isEqualTo("parsed");
+        assertThat(count("SELECT count(*) FROM dialect_feature d JOIN member m ON m.id=d.member_id WHERE m.name='ODD' AND d.feature='FALLBACK PARSER koopa'")).isEqualTo(1);
         assertThat(reports.unknownMembers()).extracting(m -> m.get("classify_reason")).contains("binary content", "empty", "no known content signature");
         assertThat(count("SELECT count(*) FROM program WHERE program_id='CALLER'")).isEqualTo(1);
     }

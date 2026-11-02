@@ -35,11 +35,13 @@ public final class ResilientParser {
             t.setDaemon(true);
             t.start();
             try {
-                t.join(timeout.toMillis());
+                // The fallback is an island parser whose backtracking can blow up on a big member: it gets a quarter of
+                // the budget, since a member it cannot do in time goes to the report either way.
+                t.join(p == chain.get(0) ? timeout.toMillis() : Math.max(1, timeout.toMillis() / 4));
                 if (t.isAlive()) {
                     t.interrupt();
                     t.join(2000);
-                    failure.set(new CobolParseException("timed out after " + timeout.toMillis() + "ms", null));
+                    failure.set(new CobolParseException("timed out after " + (p == chain.get(0) ? timeout.toMillis() : timeout.toMillis() / 4) + "ms", null));
                     result.set(null);
                 }
             } catch (InterruptedException e) {
@@ -50,9 +52,13 @@ public final class ResilientParser {
                 return new Outcome(result.get(), p.name(), true, null, null, rejected);
             }
             Throwable f = failure.get();
-            lastError = p.name() + ": " + (f == null ? "no result" : f.getClass().getSimpleName() + ": " + f.getMessage());
-            lastAt = f instanceof CobolParseException c ? c.at() : null;
-            rejected.add(lastError);
+            String why = p.name() + ": " + (f == null ? "no result" : f.getClass().getSimpleName() + ": " + f.getMessage());
+            // The primary parser's reason says what is unusual about the source; a fallback's rarely adds to it.
+            if (rejected.isEmpty()) {
+                lastError = why;
+                lastAt = f instanceof CobolParseException c ? c.at() : null;
+            }
+            rejected.add(why);
         }
         return new Outcome(null, null, false, lastError, lastAt, rejected);
     }

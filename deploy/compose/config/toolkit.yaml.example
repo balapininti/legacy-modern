@@ -1,0 +1,28 @@
+# Copy to toolkit.yaml and edit, or run: ./toolkit init
+client: my-client
+source:
+  root: /data/source
+  refresh: manual
+  encoding: auto
+  format: auto
+  dialect: ibm-enterprise
+  include: ["**/*"]
+  exclude: ["**/*.lst"]
+mcp:
+  transport: http
+  auth: token
+zos:
+  enabled: false
+  method: none
+target:
+  java: 21
+  spring_boot: "3.4"
+  angular: 19
+  build: maven
+  database: postgresql
+  package_root: com.example.app
+  local_path: /data/target
+  index_existing: false
+scope:
+  phase1_programs: []
+  phase1_jobs: []

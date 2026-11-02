@@ -1,0 +1,40 @@
+image:
+  repository: modtoolkit/toolkit
+  uiRepository: modtoolkit/toolkit-ui
+  tag: 0.1.0-SNAPSHOT
+  pullPolicy: IfNotPresent
+# Set database.url to use an existing Postgres 16 with pgvector; otherwise the chart runs one.
+database:
+  url: ""
+  storage: 50Gi
+  image: pgvector/pgvector:pg16
+# Names of existing Secrets. The chart never holds secret values.
+secrets:
+  # Keys: db-password, admin-password, and optionally llm-key, zos-user, zos-password.
+  name: toolkit-secrets
+  # A kubernetes.io/tls Secret for nginx.
+  tlsName: toolkit-tls
+source:
+  # An existing PVC holding the source export, mounted read-only.
+  claimName: toolkit-source
+target:
+  claimName: ""
+captures:
+  storage: 50Gi
+oidc:
+  issuer: ""
+  clientId: ""
+config: |
+  client: my-client
+  source:
+    root: /data/source
+    refresh: manual
+ingress:
+  enabled: false
+  host: mod-toolkit.example.internal
+replicas:
+  api: 1
+  mcp: 2
+resources:
+  api: {requests: {cpu: "1", memory: 2Gi}, limits: {memory: 4Gi}}
+  mcp: {requests: {cpu: "500m", memory: 1Gi}, limits: {memory: 2Gi}}

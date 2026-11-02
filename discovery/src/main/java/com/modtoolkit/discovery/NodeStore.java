@@ -73,14 +73,17 @@ public final class NodeStore {
                     st.setArray(3, sa);
                     try (var rs = st.executeQuery()) {
                         while (rs.next()) {
-                            Key k = new Key(rs.getString(2), rs.getString(3), rs.getString(4));
-                            cache.put(k, rs.getLong(1));
-                            out.put(k, rs.getLong(1));
+                            out.put(new Key(rs.getString(2), rs.getString(3), rs.getString(4)), rs.getLong(1));
                         }
                     }
                 }
                 return null;
             }));
+            // Only now: another thread reading the cache will reference this row, so it must already be committed.
+            for (Key k : missing) {
+                Long id = out.get(k);
+                if (id != null) cache.put(k, id);
+            }
         }
         return out;
     }

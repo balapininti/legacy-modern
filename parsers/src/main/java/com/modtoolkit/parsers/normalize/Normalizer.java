@@ -55,10 +55,12 @@ public final class Normalizer {
         if (ebcdicShare >= 0.60 && ebcdicSpace > asciiSpace) {
             return ebcdicBracket1047 > ebcdicBracket037 ? "cp1047" : "cp037";
         }
-        if (asciiShare >= 0.90 && nul == 0) {
+        // A stray NUL in a long text file happens in real exports; only a real share of them means binary.
+        boolean fewNuls = nul <= n / 200;
+        if (asciiShare >= 0.90 && fewNuls) {
             return "utf-8";
         }
-        if (nul > 0 || asciiShare < 0.70) {
+        if (!fewNuls || asciiShare < 0.70) {
             return "binary";
         }
         return "utf-8"; // Mostly ASCII with some high bytes: Latin comments in otherwise normal source.
@@ -104,7 +106,8 @@ public final class Normalizer {
             if (l.isBlank()) continue;
             if (FREE_DIRECTIVE.matcher(l).find()) return NormalizedMember.Format.FREE;
             total++;
-            if (l.length() >= 7 && " *-/dD$".indexOf(l.charAt(6)) >= 0 && l.length() <= 80) fixed++;
+            // Length says nothing: a fixed-format line may run past column 80 with comments or identification text.
+            if (l.length() >= 7 && " *-/dD$".indexOf(l.charAt(6)) >= 0) fixed++;
             else if (l.length() < 7 && l.substring(0, Math.min(6, l.length())).chars().allMatch(c -> c == ' ' || Character.isDigit(c))) fixed++;
         }
         return total == 0 || fixed >= total * 0.8 ? NormalizedMember.Format.FIXED : NormalizedMember.Format.FREE;

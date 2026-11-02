@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ .Release.Name }}-config}
+data:
+  toolkit.yaml: |
+{{ .Values.config | indent 4 }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: {{ .Release.Name }}-captures}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: {{ .Values.captures.storage }}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: {{ .Release.Name }}-api, labels: {app: {{ .Release.Name }}-api}}
+spec:
+  replicas: {{ .Values.replicas.api }}
+  selector: {matchLabels: {app: {{ .Release.Name }}-api}}
+  template:
+    metadata: {labels: {app: {{ .Release.Name }}-api}}
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["serve"]
+          ports: [{containerPort: 8080}]
+          env:
+            {{- include "toolkit.env" . | nindent 12 }}
+            - name: TOOLKIT_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.name }}, key: admin-password}}
+          volumeMounts:
+            {{- include "toolkit.mounts" . | nindent 12 }}
+          readinessProbe: {httpGet: {path: /actuator/health, port: 8080}, periodSeconds: 5, failureThreshold: 40}
+          resources: {{- toYaml .Values.resources.api | nindent 12 }}
+      volumes:
+        {{- include "toolkit.volumes" . | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ .Release.Name }}-api}
+spec:
+  selector: {app: {{ .Release.Name }}-api}
+  ports: [{port: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: {{ .Release.Name }}-mcp, labels: {app: {{ .Release.Name }}-mcp}}
+spec:
+  replicas: {{ .Values.replicas.mcp }}
+  selector: {matchLabels: {app: {{ .Release.Name }}-mcp}}
+  template:
+    metadata: {labels: {app: {{ .Release.Name }}-mcp}}
+    spec:
+      containers:
+        - name: mcp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["mcp", "http"]
+          ports: [{containerPort: 8081}]
+          env:
+            {{- include "toolkit.env" . | nindent 12 }}
+          volumeMounts:
+            {{- include "toolkit.mounts" . | nindent 12 }}
+          readinessProbe: {httpGet: {path: /actuator/health, port: 8081}, periodSeconds: 5, failureThreshold: 40}
+          resources: {{- toYaml .Values.resources.mcp | nindent 12 }}
+      volumes:
+        {{- include "toolkit.volumes" . | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ .Release.Name }}-mcp}
+spec:
+  selector: {app: {{ .Release.Name }}-mcp}
+  # A session lives on one server, so a client must keep landing on the same one.
+  sessionAffinity: ClientIP
+  ports: [{port: 8081}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: {{ .Release.Name }}-ui, labels: {app: {{ .Release.Name }}-ui}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: {{ .Release.Name }}-ui}}
+  template:
+    metadata: {labels: {app: {{ .Release.Name }}-ui}}
+    spec:
+      containers:
+        - name: ui
+          image: "{{ .Values.image.uiRepository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{containerPort: 8443}]
+          env:
+            - {name: API_HOST, value: "{{ .Release.Name }}-api:8080"}
+            - {name: MCP_HOST, value: "{{ .Release.Name }}-mcp:8081"}
+            - {name: OIDC_ORIGIN, value: {{ .Values.oidc.issuer | quote }}}
+          volumeMounts:
+            - {name: tls, mountPath: /etc/toolkit/tls, readOnly: true}
+      volumes:
+        - name: tls
+          secret: {secretName: {{ .Values.secrets.tlsName }}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ .Release.Name }}-ui}
+spec:
+  selector: {app: {{ .Release.Name }}-ui}
+  ports: [{port: 8443}]
+{{- if not .Values.database.url }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: {{ .Release.Name }}-postgres}
+spec:
+  serviceName: {{ .Release.Name }}-postgres
+  replicas: 1
+  selector: {matchLabels: {app: {{ .Release.Name }}-postgres}}
+  template:
+    metadata: {labels: {app: {{ .Release.Name }}-postgres}}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.database.image }}
+          args: ["-c", "max_connections=200"]
+          ports: [{containerPort: 5432}]
+          env:
+            - {name: POSTGRES_DB, value: toolkit}
+            - {name: POSTGRES_USER, value: toolkit}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.name }}, key: db-password}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pg}
+          volumeMounts: [{name: pgdata, mountPath: /var/lib/postgresql/data}]
+          readinessProbe: {exec: {command: ["pg_isready", "-U", "toolkit", "-d", "toolkit"]}, periodSeconds: 5}
+  volumeClaimTemplates:
+    - metadata: {name: pgdata}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: {{ .Values.database.storage }}}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ .Release.Name }}-postgres}
+spec:
+  clusterIP: None
+  selector: {app: {{ .Release.Name }}-postgres}
+  ports: [{port: 5432}]
+{{- end }}
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+spec:
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: {{ .Release.Name }}-ui, port: {number: 8443}}}
+  tls:
+    - hosts: [{{ .Values.ingress.host }}]
+      secretName: {{ .Values.secrets.tlsName }}
+{{- end }}

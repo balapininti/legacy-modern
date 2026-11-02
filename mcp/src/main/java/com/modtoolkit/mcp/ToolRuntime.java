@@ -23,9 +23,11 @@ public class ToolRuntime {
     private final ObjectMapper json = new ObjectMapper();
     private final Paginator paginator = new Paginator(json);
     private final AuditLog audit;
+    private final org.springframework.beans.factory.ObjectProvider<io.micrometer.core.instrument.MeterRegistry> meters;
 
-    public ToolRuntime(AuditLog audit) {
+    public ToolRuntime(AuditLog audit, org.springframework.beans.factory.ObjectProvider<io.micrometer.core.instrument.MeterRegistry> meters) {
         this.audit = audit;
+        this.meters = meters;
     }
 
     public Outcome call(ToolDef tool, String rawArgs, Identity who) {
@@ -52,6 +54,8 @@ public class ToolRuntime {
             outcome = "INTERNAL";
             return new Outcome(errorJson("INTERNAL", "the tool failed unexpectedly", "the error is in the server log; try again or tell your modernization lead"), true);
         } finally {
+            var registry = meters.getIfAvailable();
+            if (registry != null) registry.timer("toolkit.tool.latency", "tool", tool.name(), "outcome", outcome).record(java.time.Duration.ofNanos(System.nanoTime() - t0));
             try {
                 audit.record(who.username(), "tool_call", tool.name(), hash, (System.nanoTime() - t0) / 1_000_000, null, outcome);
             } catch (RuntimeException e) {

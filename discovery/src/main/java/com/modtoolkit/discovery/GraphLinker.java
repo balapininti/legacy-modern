@@ -24,6 +24,16 @@ final class GraphLinker {
     }
 
     void link() throws Exception {
+        // A copybook that only makes sense inside its program is no failure if a program using it parsed.
+        jdbc.update("""
+                UPDATE member m SET parse_status = 'in_context', parse_error = NULL WHERE m.type = 'copybook' AND m.parse_status = 'failed'
+                  AND EXISTS (SELECT 1 FROM copy_use u JOIN member p ON p.id = u.member_id WHERE upper(u.copybook_name) = upper(m.name) AND p.parse_status = 'parsed')""");
+        // Where a dynamic CALL has several possible literals and some are programs, the others were never targets.
+        jdbc.update("""
+                DELETE FROM graph_edge e USING graph_node d WHERE d.id = e.dst_id AND e.type = 'CALLS' AND e.attrs->>'mode' = 'dynamic'
+                  AND NOT EXISTS (SELECT 1 FROM program p WHERE upper(p.program_id) = d.name)
+                  AND EXISTS (SELECT 1 FROM graph_edge o JOIN graph_node od ON od.id = o.dst_id WHERE o.type = 'CALLS' AND o.member_id = e.member_id AND o.line = e.line AND o.attrs->>'mode' = 'dynamic'
+                              AND EXISTS (SELECT 1 FROM program q WHERE upper(q.program_id) = od.name))""");
         jdbc.update("UPDATE copy_use u SET copybook_id = c.id FROM copybook c WHERE upper(c.name) = upper(u.copybook_name) AND u.copybook_id IS NULL");
         // USING on a program a JCL step runs is its PARM, not a sign of being a subroutine.
         jdbc.update("UPDATE program p SET kind = 'batch' WHERE p.kind = 'subroutine' AND EXISTS (SELECT 1 FROM jcl_step s WHERE upper(s.pgm) = upper(p.program_id))");

@@ -66,7 +66,7 @@ final class FactExtractor extends Cobol85BaseListener {
     }
 
     private int expanded(int preLine) {
-        return preLine - 1 < toExpanded.length && preLine >= 1 ? toExpanded[preLine - 1] : preLine;
+        return toExpanded != null && preLine - 1 < toExpanded.length && preLine >= 1 ? toExpanded[preLine - 1] : preLine;
     }
 
     private Loc loc(Token t) {
@@ -216,18 +216,26 @@ final class FactExtractor extends Cobol85BaseListener {
     }
 
     private void openParagraph(String name, Token t) {
+        openParagraphAt(name, expanded(t.getLine()));
+    }
+
+    private void openParagraphAt(String name, int line) {
         st.paragraph = name;
-        st.paraStart = expanded(t.getLine());
+        st.paraStart = line;
         st.paraComplexity = 1;
         st.paraMaxNest = 0;
         st.lastTerminal = false;
     }
 
     private void closeParagraph(Token next) {
+        closeParagraphBefore(next == null ? -1 : expanded(next.getLine()));
+    }
+
+    private void closeParagraphBefore(int nextLine) {
         if (st.paraStart < 0) return;
         if (st.paragraph != null) {
             Loc start = src.origin(st.paraStart);
-            int end = next == null ? st.paraStart : Math.max(st.paraStart, expanded(next.getLine()) - 1);
+            int end = nextLine < 0 ? st.paraStart : Math.max(st.paraStart, nextLine - 1);
             // The range stays in the paragraph's own member even when it ends inside a copybook.
             while (end > st.paraStart && !src.origin(end).member().equals(start.member())) end--;
             st.paraIdx.put(st.paragraph, st.p.paragraphs.size());
@@ -390,6 +398,7 @@ final class FactExtractor extends Cobol85BaseListener {
             String t = baseName(to);
             st.p.moves.add(new Move("MOVE", from, t, lit, loc(c), st.paragraph));
             if (lit && s.literal().NONNUMERICLITERAL() != null) literal(t, from);
+            else if (lit == false && from != null && st.literalsOf.containsKey(from)) st.literalsOf.get(from).forEach(v -> literal(t, v));
         }
     }
 
@@ -424,8 +433,12 @@ final class FactExtractor extends Cobol85BaseListener {
         }
     }
 
+    private static final Set<String> FIGURATIVE = Set.of("SPACE", "SPACES", "ZERO", "ZEROS", "ZEROES", "LOW-VALUE", "LOW-VALUES", "HIGH-VALUE", "HIGH-VALUES", "QUOTE", "QUOTES", "NULL", "NULLS", "ALL");
+
     private void literal(String var, String value) {
-        if (value == null || value.isBlank()) return;
+        if (value == null || value.isBlank() || FIGURATIVE.contains(value.strip().toUpperCase(Locale.ROOT))) return;
+        // A dynamic target is a load module name; a message or a path moved into the same field is not one.
+        if (!value.strip().matches("[A-Za-z@#$][A-Za-z0-9@#$]{0,7}") && !var.endsWith("OBJECTNAME") && !var.contains("QUEUE") && !var.contains("-Q")) return;
         st.literalsOf.computeIfAbsent(var, k -> new LinkedHashSet<>()).add(value.strip().toUpperCase(Locale.ROOT));
     }
 
@@ -462,9 +475,11 @@ final class FactExtractor extends Cobol85BaseListener {
     }
 
     private void finish(State s, ProgramUnitContext c) {
+        finishAt(s, expanded(c.getStart().getLine()), expanded(c.getStop().getLine()));
+    }
+
+    private void finishAt(State s, int startExp, int endExp) {
         ProgramFacts p = s.p;
-        int startExp = expanded(c.getStart().getLine());
-        int endExp = expanded(c.getStop().getLine());
         p.lineEnd = src.origin(endExp).line();
         layout(s);
         for (PendingCond pc : s.conds) {
@@ -674,6 +689,136 @@ final class FactExtractor extends Cobol85BaseListener {
         if (thru == null) return;
         Integer a = s.paraIdx.get(target), b = s.paraIdx.get(thru);
         if (a != null && b != null) for (int i = a; i <= b; i++) e.add(s.paraOrder.get(i));
+    }
+
+    // The same assembly, driven by another front end: lines are already expanded-source lines.
+
+    void beginProgram(int line) {
+        if (st != null) stack.push(st);
+        State s = new State();
+        s.p.parent = st == null ? null : st.p.programId;
+        s.p.start = src.origin(line);
+        st = s;
+    }
+
+    void programName(String name) {
+        st.p.programId = up(unquote(name));
+    }
+
+    void endProgram(int startLine, int endLine) {
+        closeParagraphBefore(endLine + 1);
+        finishAt(st, startLine, endLine);
+        facts.programs.add(st.p);
+        st = stack.isEmpty() ? null : stack.pop();
+    }
+
+    void dataSection(String section) {
+        st.dataSection = section;
+    }
+
+    void dataItem(int level, String name, String pic, String usage, boolean signSep, Integer occMin, Integer occMax, String odo, String redefines, List<String> values, int line) {
+        st.items.add(new CopybookLayout.Item(level, up(name), up(pic), up(usage), signSep, occMax == null ? 1 : occMax, up(redefines)));
+        st.itemExtra.add(new Object[] {occMin, occMax, up(odo), src.origin(line), st.dataSection, values});
+        if (name != null) values.forEach(v -> literal(up(name), v));
+    }
+
+    void condition(String name, List<String> values, int line) {
+        st.conds.add(new PendingCond(st.items.size() - 1, up(name), values, src.origin(line)));
+    }
+
+    void file(String name, String assign, int line) {
+        st.p.files.add(new FileFact(up(name), up(assign), src.origin(line)));
+    }
+
+    void procedureUsing(List<String> names, int line) {
+        st.inProcedure = true;
+        if (!names.isEmpty()) {
+            st.p.usingParams = true;
+            names.forEach(n -> st.p.usingList.add(up(n)));
+        }
+        openParagraphAt(null, line);
+    }
+
+    void section(String name, int line) {
+        closeParagraphBefore(line);
+        st.section = up(name);
+        openParagraphAt(st.section, line);
+    }
+
+    void paragraph(String name, int line) {
+        closeParagraphBefore(line);
+        openParagraphAt(up(name), line);
+    }
+
+    void callLiteral(String target, List<String> using, int line) {
+        addStaticCall(up(unquote(target)), up(using), src.origin(line));
+    }
+
+    void callVariable(String variable, List<String> using, int line) {
+        st.pendingCalls.add(new PendingCall(up(variable), up(using), src.origin(line), st.paragraph));
+    }
+
+    private static List<String> up(List<String> l) {
+        return l.stream().map(FactExtractor::up).toList();
+    }
+
+    void perform(String target, String thru, int line) {
+        st.p.performs.add(new Perform(st.paragraph, up(target), up(thru), src.origin(line)));
+    }
+
+    void goTo(String target, boolean depending, int line) {
+        st.p.gotos.add(new GoTo(st.paragraph, up(target), depending, src.origin(line)));
+        if (!depending) terminal();
+    }
+
+    void move(String kind, String from, String to, boolean isLiteral, int line) {
+        String f = isLiteral ? unquote(from) : up(from);
+        st.p.moves.add(new Move(kind, f, up(to), isLiteral, src.origin(line), st.paragraph));
+        if (isLiteral && from.length() > 1 && (from.charAt(0) == '\'' || from.charAt(0) == '"')) literal(up(to), f);
+    }
+
+    void fileIoAt(String verb, String file, int line) {
+        st.p.fileIo.add(new FileIo(verb, up(file), src.origin(line), st.paragraph));
+    }
+
+    void stop(String verb, int line) {
+        st.p.stops.add(new Stop(verb, src.origin(line), st.paragraph));
+        terminal();
+    }
+
+    void cancel(String target, int line) {
+        st.p.cancels.add(new Cancel(up(unquote(target)), src.origin(line), st.paragraph));
+        facts.features.add("CANCEL");
+    }
+
+    void sort(String verb, String file, List<String> using, List<String> giving, int line) {
+        facts.features.add(verb);
+        st.p.sorts.add(new SortFact(verb, up(file), up(using), up(giving), src.origin(line), st.paragraph));
+    }
+
+    void feature(String f) {
+        facts.features.add(f);
+    }
+
+    void branched() {
+        branch();
+    }
+
+    void nestIn() {
+        nest();
+    }
+
+    void nestOut() {
+        st.nesting--;
+    }
+
+    /** Called as each statement starts, so a paragraph ends terminally only if its last top-level statement does. */
+    void statement() {
+        if (st != null && st.nesting == 0) st.lastTerminal = false;
+    }
+
+    CobolFacts result() {
+        return facts;
     }
 
     /** Small helper: order-preserving de-duplication. */

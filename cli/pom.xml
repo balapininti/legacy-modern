@@ -13,10 +13,41 @@
     <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-verify</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-api</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.apache.logging.log4j</groupId><artifactId>log4j-layout-template-json</artifactId></dependency>
+    <dependency><groupId>io.micrometer</groupId><artifactId>micrometer-registry-prometheus</artifactId></dependency>
     <dependency><groupId>info.picocli</groupId><artifactId>picocli</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
   </dependencies>
-  <build><finalName>toolkit</finalName><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId><configuration><mainClass>com.modtoolkit.cli.ToolkitMain</mainClass></configuration><executions><execution><goals><goal>repackage</goal></goals></execution></executions></plugin></plugins></build>
+  <profiles>
+    <!-- Local image for Compose and the air-gap bundle: mvn -Pimage package. Base image: deploy/base. -->
+    <profile>
+      <id>image</id>
+      <build><plugins><plugin>
+        <groupId>com.google.cloud.tools</groupId>
+        <artifactId>jib-maven-plugin</artifactId>
+        <version>3.5.2</version>
+        <configuration>
+          <from><image>docker://modtoolkit/base:1</image></from>
+          <to><image>modtoolkit/toolkit:${project.version}</image></to>
+          <container>
+            <mainClass>com.modtoolkit.cli.ToolkitMain</mainClass>
+            <jvmFlags><jvmFlag>-Dtoolkit.log=err</jvmFlag><jvmFlag>-XX:MaxRAMPercentage=75</jvmFlag></jvmFlags>
+            <environment>
+              <TOOLKIT_NG_EXTRACT>/opt/toolkit/ng-extract/extract.js</TOOLKIT_NG_EXTRACT>
+              <TOOLKIT_TS_MODULE>/opt/ts/node_modules/typescript</TOOLKIT_TS_MODULE>
+            </environment>
+            <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+          </container>
+          <extraDirectories><paths><path><from>${project.basedir}/../tools/ng-extract</from><into>/opt/toolkit/ng-extract</into><excludes>node_modules/**</excludes></path></paths></extraDirectories>
+          <allowInsecureRegistries>false</allowInsecureRegistries>
+        </configuration>
+        <executions><execution><phase>package</phase><goals><goal>dockerBuild</goal></goals></execution></executions>
+      </plugin></plugins></build>
+    </profile>
+  </profiles>
+  <build><finalName>toolkit</finalName><plugins>
+      <!-- Otherwise a change only in another module leaves the old fat jar in place, silently testing stale code. -->
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><configuration><forceCreation>true</forceCreation></configuration></plugin>
+      <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId><configuration><mainClass>com.modtoolkit.cli.ToolkitMain</mainClass></configuration><executions><execution><goals><goal>repackage</goal></goals></execution></executions></plugin></plugins></build>
 </project>
