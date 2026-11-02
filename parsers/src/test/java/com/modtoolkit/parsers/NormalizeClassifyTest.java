@@ -103,6 +103,12 @@ class NormalizeClassifyTest {
     }
 
     @Test
+    void templatedJclAndScriptLanguagesAreNotMisread() {
+        assertThat(type("//<WUIAPPL> JOB 241901,'WUI',CLASS=A\n//GENAPP1  EXEC PGM=DFHSIP\n")).isEqualTo(MemberType.JCL);
+        assertThat(type("/*****/\n/* (C) */\n/*****/\nmsgtxt(ssc1a1)\ntext('hello');\nwait;\n")).isNotEqualTo(MemberType.PLI);
+    }
+
+    @Test
     void aReadmeWithCodeSamplesIsNotPli() {
         String md = "# The Authorization Module\n\nThis module handles pending authorizations for the online system and more.\n\n```sql\nDECLARE C1 CURSOR FOR SELECT A;\nSET X = 1;\nSET Y = 2;\n/* a comment */\n```\n\n## Usage\n\nSee the [guide](http://example.com/guide) for details on how it is all put together.\n";
         assertThat(type(md)).isEqualTo(MemberType.UNKNOWN);

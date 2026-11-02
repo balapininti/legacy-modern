@@ -135,12 +135,28 @@ public final class ParserInput {
             StringBuilder body = new StringBuilder(s.substring(bodyStart));
             int j = i;
             Matcher e = END_EXEC.matcher(body);
+            boolean runaway = false;
             while (!e.find() && j + 1 < l.size() && j - i < 5000) {
+                String next = l.get(j + 1);
+                // Another EXEC before this one's END-EXEC: the terminator is lost, and reading on would swallow statements.
+                Matcher again = EXEC.matcher(next);
+                if (again.find() && outsideLiteral(next, again.start())) {
+                    runaway = true;
+                    break;
+                }
                 j++;
-                body.append(' ').append(l.get(j).length() > 7 ? l.get(j).substring(7) : "");
+                body.append(' ').append(next.length() > 7 ? next.substring(7) : "");
                 e = END_EXEC.matcher(body);
             }
             e = END_EXEC.matcher(body);
+            if (runaway) {
+                // Record what can be read, and blank only this block.
+                out.add(new ExecBlock(kind, i + 1, j + 1, body.toString().replaceAll("\\s+", " ").strip()));
+                l.set(i, s.substring(0, bodyStart) + (kind.equals("SQL") ? "EXEC SQL X END-EXEC" : "EXEC CICS X END-EXEC"));
+                for (int k = i + 1; k <= j; k++) l.set(k, "");
+                i = j;
+                continue;
+            }
             if (!e.find()) continue; // Unterminated: leave it for the parser to report.
             String text = body.substring(0, e.start()).replaceAll("\\s+", " ").strip();
             String tail = body.substring(e.end());

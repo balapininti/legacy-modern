@@ -274,6 +274,25 @@ class CobolExtractionTest {
         assertThat(com.modtoolkit.parsers.normalize.NormalizedMember.fixedLine("000100 MOVE A TO B.                                                     SEQ00001")).isEqualTo("       MOVE A TO B.");
     }
 
+    /** From a real program: END-EXEC crossed column 72, and the block ate the next 24 lines. */
+    @Test
+    void aLostEndExecDoesNotSwallowTheStatementsAfterIt() {
+        String overrun = "                   EXEC CICS LINK PROGRAM('GUSV') COMMAREA(WS-AB-KEY) END-EXEC";
+        assertThat(overrun.length()).isGreaterThan(72);
+        assertThat(com.modtoolkit.parsers.normalize.NormalizedMember.fixedLine(overrun)).endsWith("END-EXEC");
+        // Even a terminator that really is gone cannot take the next statement with it.
+        ProgramFacts p = one(HEAD + """
+       PROCEDURE DIVISION.
+       P1.
+           EXEC CICS LINK PROGRAM('AAA') COMMAREA(WS-A)
+           EXEC CICS SEND MAP('MAP1') END-EXEC.
+           GOBACK.
+""");
+        assertThat(p.cics).extracting(Cics::command, Cics::resourceName).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("LINK", "AAA"), org.assertj.core.groups.Tuple.tuple("SEND", "MAP1"));
+        assertThat(p.cics.get(1).loc().line()).isEqualTo(9);
+    }
+
     @Test
     void aCopybookMayShareItsNameWithTheProgram() {
         copy("MAIN", "       01 FROM-COPY PIC X.\n");

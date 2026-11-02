@@ -10,8 +10,8 @@ public final class Classifier {
     private static Pattern p(String r) { return Pattern.compile(r, Pattern.CASE_INSENSITIVE | Pattern.MULTILINE); }
     private static final Pattern ID_DIV = p("^.{0,12}\\b(IDENTIFICATION|ID)\\s+DIVISION\\s*\\.");
     private static final Pattern PROC_DIV = p("\\bPROCEDURE\\s+DIVISION\\b");
-    private static final Pattern JCL_JOB = p("^//[A-Z0-9@#$]{0,8}\\s+JOB(\\s|$)");
-    private static final Pattern JCL_PROC = p("^//[A-Z0-9@#$]{0,8}\\s+PROC(\\s|$)|^//[A-Z0-9@#$]*\\s+PEND(\\s|$)");
+    private static final Pattern JCL_JOB = p("^//\\S{0,20}\\s+JOB(\\s|$)");
+    private static final Pattern JCL_PROC = p("^//\\S{0,20}\\s+PROC(\\s|$)|^//\\S*\\s+PEND(\\s|$)");
     private static final Pattern JCL_ANY = p("^//[A-Z0-9@#$]*\\s+(EXEC|DD|SET|INCLUDE|IF|ENDIF|JCLLIB)(\\s|$)");
     private static final Pattern BMS = p("\\bDFHMSD\\b|\\bDFHMDI\\b");
     private static final Pattern DDL = p("^\\s*CREATE\\s+((UNIQUE\\s+)?INDEX|TABLE|VIEW|TABLESPACE|DATABASE|SYNONYM|ALIAS|STOGROUP)\\b");
@@ -20,6 +20,8 @@ public final class Classifier {
     private static final Pattern LEVEL = Pattern.compile("^\\s*(0?[1-9]|[1-4][0-9]|66|77|88)\\s+(\\S+?)(\\s+(PIC|PICTURE|REDEFINES|OCCURS|COMP\\S*|BINARY|USAGE|VALUES?|PACKED-DECIMAL|DISPLAY|SIGN|JUST\\S*|BLANK|INDEXED|POINTER|RENAMES|EXTERNAL|GLOBAL|SYNC\\S*)\\b.*|\\s*\\.\\s*)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern DECLARE_TABLE = p("EXEC\\s+SQL\\s+DECLARE\\s+\\S+\\s+TABLE");
     private static final Pattern PLI = p("\\bPROC(EDURE)?\\s+OPTIONS\\s*\\(\\s*(MAIN|FETCHABLE)|^\\s*DCL\\s+\\S+|^\\s*DECLARE\\s+\\S+.*[;,]\\s*$|^\\s*\\S+\\s*:\\s*PROC\\b|^\\s*%\\s*INCLUDE\\b|^\\s*/\\*");
+    /** A real statement, since a comment banner and a semicolon also occur in test scripts and other languages. */
+    private static final Pattern PLI_STATEMENT = p("^\\s*(\\S+\\s*:\\s*)?(DCL|DECLARE|PROC|PROCEDURE|%\\s*INCLUDE|%\\s*DCL|IF\\s.*\\sTHEN|DO\\s*[;A-Z]|END\\b.*;|CALL\\s+\\S+.*;|GO\\s*TO\\s|PUT\\s+(SKIP|EDIT|LIST|FILE)|GET\\s+(EDIT|LIST|FILE)|[A-Z_#@$][A-Z0-9_#@$.]*(\\(.*\\))?\\s*=\\s*.*;)");
     private static final Pattern FIRST_CODE_SKIP = p("^\\s*(CBL\\b|PROCESS\\b|\\$SET\\b|>>|\\*>|EJECT\\b|SKIP[123]\\b|TITLE\\b).*$");
     private static final Pattern ASM = p("^\\S*\\s+(CSECT|DSECT|BALR|LTORG|AMODE|RMODE)(\\s|$)|^\\s+(MACRO|MEND)(\\s|$)|^[A-Z@#$][A-Z0-9@#$]*\\s+(DBD|PCB|PSBGEN)\\s+\\S+=");
     private static final Pattern EASY = p("^\\s*(FILE\\s+\\S+\\s+(FB|VB|VSAM|SEQUENTIAL)|JOB\\s+INPUT\\b)");
@@ -50,9 +52,9 @@ public final class Classifier {
         if (SQL_CONTROL.matcher(raw).find() && !raw.toUpperCase(java.util.Locale.ROOT).contains("DCL ")) return of(MemberType.CONTROL, "utility control statements");
         double levels = levelShare(code);
         // PL/I structures have levels too, so PL/I is decided by its statements: they end in semicolons.
-        if (PLI.matcher(raw).find() && semicolonShare(raw) >= 0.15 && levels < 0.5 && !isProse(raw)) return of(MemberType.PLI, "PL/I signature");
+        if (PLI.matcher(raw).find() && semicolonShare(raw) >= 0.15 && levels < 0.5 && PLI_STATEMENT.matcher(raw).find() && !isProse(raw)) return of(MemberType.PLI, "PL/I signature");
         if ((levels >= 0.25 || DECLARE_TABLE.matcher(code).find()) && !PROC_DIV.matcher(code).find()) return of(MemberType.COPYBOOK, "level numbers with no PROCEDURE DIVISION");
-        if (PLI.matcher(raw).find() && raw.contains("/*") && semicolonShare(raw) > 0 && !isProse(raw)) return of(MemberType.PLI, "PL/I signature");
+        if (PLI.matcher(raw).find() && raw.contains("/*") && semicolonShare(raw) > 0 && PLI_STATEMENT.matcher(raw).find() && !isProse(raw)) return of(MemberType.PLI, "PL/I signature");
         if (ASM.matcher(raw).find()) return of(MemberType.ASSEMBLER, "Assembler signature");
         if (EASY.matcher(raw).find()) return of(MemberType.EASYTRIEVE, "Easytrieve signature");
         if (CLIST.matcher(raw).find()) return of(MemberType.CLIST, "CLIST signature");

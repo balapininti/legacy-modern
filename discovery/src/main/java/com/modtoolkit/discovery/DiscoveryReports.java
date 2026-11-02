@@ -34,12 +34,13 @@ public class DiscoveryReports {
         r.put("unresolved_dynamic_calls", one("SELECT count(*) FROM unresolved_call"));
         r.put("missing_copybooks", one("SELECT count(DISTINCT c.name) FROM missing_copybook c WHERE " + NOT_SYMBOLIC_MAP));
         r.put("symbolic_maps_generated_from_bms", one("SELECT count(DISTINCT c.name) FROM missing_copybook c WHERE NOT (" + NOT_SYMBOLIC_MAP + ")"));
-        r.put("missing_procs", one("SELECT count(DISTINCT feature) FROM dialect_feature WHERE feature LIKE 'MISSING PROC %'"));
+        r.put("missing_proc_names", one("SELECT count(DISTINCT feature) FROM dialect_feature WHERE feature LIKE 'MISSING PROC %'"));
         r.put("jobs", one("SELECT count(*) FROM jcl_job"));
         r.put("job_steps", one("SELECT count(*) FROM jcl_step"));
         r.put("maps", one("SELECT count(*) FROM bms_map"));
         r.put("map_fields", one("SELECT count(*) FROM bms_field"));
-        r.put("db2_tables", one("SELECT count(*) FROM db2_table"));
+        r.put("db2_tables_with_ddl", one("SELECT count(*) FROM db2_table"));
+        r.put("db2_tables_referenced", one("SELECT count(*) FROM graph_node n WHERE n.kind = 'table' AND EXISTS (SELECT 1 FROM graph_edge e WHERE e.dst_id = n.id AND e.type IN ('SELECTS','INSERTS','UPDATES','DELETES'))"));
         r.put("dead_code_candidates", deadCodeCandidates().size());
         r.put("dialect_features", counts("SELECT feature, count(DISTINCT member_id) FROM dialect_feature WHERE feature NOT LIKE 'MISSING PROC %' GROUP BY feature ORDER BY feature"));
         return r;
@@ -57,7 +58,8 @@ public class DiscoveryReports {
         m.put("system_api", sys);
         m.put("resolved_in_estate", resolved);
         long denominator = total - sys;
-        m.put("resolved_pct", denominator == 0 ? 100.0 : Math.round(resolved * 10000.0 / denominator) / 100.0);
+        // No calls to resolve is not "100% resolved": null says there was nothing to measure.
+        m.put("resolved_pct", denominator == 0 ? null : Math.round(resolved * 10000.0 / denominator) / 100.0);
         return m;
     }
 

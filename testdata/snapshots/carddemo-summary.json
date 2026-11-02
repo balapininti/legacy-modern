@@ -1,5 +1,6 @@
 {
-  "db2_tables" : 5,
+  "db2_tables_referenced" : 3,
+  "db2_tables_with_ddl" : 5,
   "dead_code_candidates" : 1,
   "dialect_features" : {
     "ALTER" : 1,
@@ -48,17 +49,16 @@
     "assembler" : 8,
     "bms" : 21,
     "cobol" : 44,
-    "control" : 4,
+    "control" : 9,
     "copybook" : 65,
     "csd" : 8,
     "ddl" : 7,
     "jcl" : 56,
-    "pli" : 7,
     "proc" : 6,
-    "unknown" : 103
+    "unknown" : 105
   },
   "missing_copybooks" : 0,
-  "missing_procs" : 0,
+  "missing_proc_names" : 0,
   "parse_status" : {
     "inventoried" : 122,
     "parsed" : 207

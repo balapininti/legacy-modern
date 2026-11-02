@@ -8,8 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @ConditionalOnWebApplication
-public class AuthController {
+public class AuthController implements org.springframework.beans.factory.SmartInitializingSingleton {
     public record Login(String username, String password) {}
 
     private final JdbcTemplate jdbc;
@@ -41,9 +39,12 @@ public class AuthController {
         this.env = env;
     }
 
-    /** The first-run admin takes its password from the environment, so no default password ever ships. */
-    @EventListener(ApplicationReadyEvent.class)
-    public void bootstrapAdmin() {
+    /**
+     * The first-run admin takes its password from the environment, so no default password ever ships. This runs before
+     * the web server opens: on a ready event instead, a login straight after startup could find no admin yet.
+     */
+    @Override
+    public void afterSingletonsInstantiated() {
         String pw = env.getProperty("TOOLKIT_ADMIN_PASSWORD");
         if (pw == null || pw.isBlank()) return;
         tokens.ensureUser("admin", List.of("admin"));

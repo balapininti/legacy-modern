@@ -45,7 +45,8 @@ public class LexicalSearch {
 
     public List<SearchHit> search(String query, List<String> kinds, int limit) {
         List<Term> terms = terms(query);
-        if (terms.isEmpty()) return List.of();
+        List<String> partials = partialIdentifiers(query, terms);
+        if (terms.isEmpty() && partials.isEmpty()) return List.of();
         String arr = kinds == null || kinds.isEmpty() ? null : "{" + String.join(",", kinds) + "}";
         StringBuilder score = new StringBuilder("(0");
         StringBuilder where = new StringBuilder("(false");
@@ -68,7 +69,7 @@ public class LexicalSearch {
         score.append(")");
         where.append(")");
         // A partial identifier: only for what looks like one, since a substring of an ordinary word is everywhere.
-        for (String part : partialIdentifiers(query, terms)) {
+        for (String part : partials) {
             where.append(" OR c.text ILIKE ?");
             whereArgs.add("%" + escapeLike(part) + "%");
             score.append(" + CASE WHEN c.text ILIKE ? THEN 1.0 ELSE 0 END");
@@ -84,7 +85,7 @@ public class LexicalSearch {
                 + "FROM chunk c LEFT JOIN member m ON m.id = c.member_id LEFT JOIN knowledge_artifact a ON a.id = c.artifact_id "
                 + "WHERE " + where + " AND coalesce(a.status, '') <> 'rejected'" + (arr == null ? "" : " AND c.kind = ANY(?::text[])")
                 + " ORDER BY score DESC, 2, c.line_start LIMIT ?";
-        String needle = terms.get(0).token();
+        String needle = terms.isEmpty() ? partials.get(0) : terms.get(0).token();
         return jdbc.query(sql, (rs, i) -> {
             Integer start = (Integer) rs.getObject(3);
             return new SearchHit(rs.getString(1), rs.getString(2), start, (Integer) rs.getObject(4), snippet(rs.getString(5), needle), rs.getDouble(9), (Long) rs.getObject(6), rs.getString(7), rs.getString(8));
