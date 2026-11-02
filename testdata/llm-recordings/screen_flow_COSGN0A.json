@@ -1,0 +1,6 @@
+{
+  "model" : "gpt-oss-32k:latest",
+  "tokens_in" : 2851,
+  "tokens_out" : 1454,
+  "text" : "{\"map\":\"COSGN0A\",\"fields\":[{\"name\":\"TRNNAME\",\"label\":\"Tran :\"},{\"name\":\"TITLE01\",\"label\":\"TITLE01\"},{\"name\":\"CURDATE\",\"label\":\"Date :\"},{\"name\":\"PGMNAME\",\"label\":\"Prog :\"},{\"name\":\"TITLE02\",\"label\":\"TITLE02\"},{\"name\":\"CURTIME\",\"label\":\"Time :\"},{\"name\":\"APPLID\",\"label\":\"AppID:\"},{\"name\":\"SYSID\",\"label\":\"SysID:\"},{\"name\":\"USERID\",\"label\":\"User ID     :\"},{\"name\":\"PASSWD\",\"label\":\"Password    :\"},{\"name\":\"ERRMSG\",\"label\":\"ERRMSG\"}],\"validations\":[],\"next_maps\":[],\"line_start\":26,\"line_end\":206}"
+}

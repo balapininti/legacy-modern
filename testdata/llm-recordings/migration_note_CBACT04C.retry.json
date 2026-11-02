@@ -1,0 +1,6 @@
+{
+  "model" : "gpt-oss-32k:latest",
+  "tokens_in" : 8958,
+  "tokens_out" : 1793,
+  "text" : "{\"items\":[{\"feature\":\"REDEFINES view for binary-to-alpha conversion\",\"line_start\":125,\"line_end\":128,\"guidance\":\"Ensure that binary-to-alpha conversion is handled correctly, mapping each byte to a character per EBCDIC encoding.\"},{\"feature\":\"REDEFINES view for DB2 timestamp format\",\"line_start\":151,\"line_end\":165,\"guidance\":\"Reconstruct the timestamp string with correct separators and numeric fields, preserving the DB2 format.\"},{\"feature\":\"EBCDIC collation for alphanumeric comparisons\",\"line_start\":210,\"line_end\":213,\"guidance\":\"Use appropriate locale or collation rules to compare alphanumeric strings as EBCDIC, not ASCII.\"},{\"feature\":\"Date format definition from CURRENT-DATE\",\"line_start\":140,\"line_end\":149,\"guidance\":\"Map the COBOL CURRENT-DATE fields to the DB2 timestamp format, ensuring correct year-month-day ordering.\"},{\"feature\":\"DB2 timestamp conversion logic\",\"line_start\":613,\"line_end\":626,\"guidance\":\"Build the DB2 timestamp string by concatenating date parts with separators, matching the expected DB2 format.\"}]}"
+}

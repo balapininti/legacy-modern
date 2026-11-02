@@ -1,0 +1,6 @@
+{
+  "model" : "gpt-oss-32k:latest",
+  "tokens_in" : 8927,
+  "tokens_out" : 4950,
+  "text" : "{\"items\":[{\"feature\":\"COMP-3 arithmetic\",\"line_start\":125,\"line_end\":139,\"guidance\":\"Use BigDecimal or equivalent to preserve packed decimal precision and rounding behavior; map COMP-3 fields to Java numeric types carefully.\"},{\"feature\":\"ROUNDED/truncation\",\"line_start\":352,\"line_end\":466,\"guidance\":\"COMPUTE and ADD statements truncate or round to the target picture; implement explicit rounding logic in Java to match COBOL's default behavior.\"},{\"feature\":\"REDEFINES views\",\"line_start\":125,\"line_end\":128,\"guidance\":\"REDEFINES creates overlapping memory views; in Java, use byte arrays or custom classes to emulate the same layout and ensure correct field extraction.\"},{\"feature\":\"EBCDIC collation\",\"line_start\":1,\"line_end\":1,\"guidance\":\"String comparisons and sorting are EBCDIC-based; use appropriate collator or convert to Unicode before comparison to maintain original ordering.\"},{\"feature\":\"Date formats\",\"line_start\":613,\"line_end\":626,\"guidance\":\"The program converts current date to DB2 timestamp format; replicate this conversion using Java's date/time API and format string 'yyyy-MM-dd-HH.mm.ss.SSSS'.\"}]}"
+}

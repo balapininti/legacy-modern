@@ -1,0 +1,745 @@
+{
+  "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+  "questions": [
+    {
+      "id": "Q01",
+      "kind": "natural",
+      "question": "Where is interest on a balance calculated, and what is the formula?",
+      "expected": [
+        {
+          "member": "app/cbl/CBACT04C.cbl",
+          "line_start": 462,
+          "line_end": 470
+        }
+      ],
+      "why": "Computes monthly interest as category balance times rate divided by 1200 and adds it to the account total."
+    },
+    {
+      "id": "Q02",
+      "kind": "natural",
+      "question": "How does sign-on check a password, and how does it choose which menu to show afterwards?",
+      "expected": [
+        {
+          "member": "app/cbl/COSGN00C.cbl",
+          "line_start": 221,
+          "line_end": 246
+        }
+      ],
+      "why": "Compares the stored password after a keyed read and transfers control to the admin or regular menu by user type."
+    },
+    {
+      "id": "Q03",
+      "kind": "natural",
+      "question": "What happens when a credit card number fails validation on the card detail and card update screens?",
+      "expected": [
+        {
+          "member": "app/cbl/COCRDSLC.cbl",
+          "line_start": 706,
+          "line_end": 715
+        },
+        {
+          "member": "app/cbl/COCRDUPC.cbl",
+          "line_start": 784,
+          "line_end": 794
+        }
+      ],
+      "why": "Non-numeric card input sets the input-error flag, a must-be-16-digits message, and zeroes the card number in the commarea."
+    },
+    {
+      "id": "Q04",
+      "kind": "natural",
+      "question": "During nightly posting, how is a transaction determined to be over the credit limit?",
+      "expected": [
+        {
+          "member": "app/cbl/CBTRN02C.cbl",
+          "line_start": 403,
+          "line_end": 413
+        }
+      ],
+      "why": "Computes cycle credit minus cycle debit plus the amount and sets reject reason 102 if the limit is lower."
+    },
+    {
+      "id": "Q05",
+      "kind": "natural",
+      "question": "When posting a transaction, what happens if no balance record exists yet for that account, type and category?",
+      "expected": [
+        {
+          "member": "app/cbl/CBTRN02C.cbl",
+          "line_start": 473,
+          "line_end": 499
+        }
+      ],
+      "why": "An invalid-key read flags creation, then the code either creates a new category balance record or updates the existing one."
+    },
+    {
+      "id": "Q06",
+      "kind": "natural",
+      "question": "How is an online bill payment recorded and applied to the account?",
+      "expected": [
+        {
+          "member": "app/cbl/COBIL00C.cbl",
+          "line_start": 210,
+          "line_end": 235
+        }
+      ],
+      "why": "On confirmation builds a type 02 category 2 transaction for the full balance, writes it, subtracts it and rewrites the account."
+    },
+    {
+      "id": "Q07",
+      "kind": "natural",
+      "question": "How is the next transaction ID generated when a transaction is created online?",
+      "expected": [
+        {
+          "member": "app/cbl/COTRN02C.cbl",
+          "line_start": 444,
+          "line_end": 451
+        },
+        {
+          "member": "app/cbl/COBIL00C.cbl",
+          "line_start": 212,
+          "line_end": 219
+        }
+      ],
+      "why": "Browses to the highest key with high-values, reads backward once, and adds 1 to the last ID."
+    },
+    {
+      "id": "Q08",
+      "kind": "natural",
+      "question": "How is a date checked to be a real calendar date, and how are failures classified?",
+      "expected": [
+        {
+          "member": "app/cbl/CSUTLDTC.cbl",
+          "line_start": 116,
+          "line_end": 149
+        }
+      ],
+      "why": "Calls the Language Environment date service and maps its feedback code to a result text."
+    },
+    {
+      "id": "Q09",
+      "kind": "natural",
+      "question": "How is February 29 validated in the shared date editing logic?",
+      "expected": [
+        {
+          "member": "app/cpy/CSUTLDPY.cpy",
+          "line_start": 243,
+          "line_end": 272
+        }
+      ],
+      "why": "Divides the year by 400 for century years or 4 otherwise and rejects a nonzero remainder as not a leap year."
+    },
+    {
+      "id": "Q10",
+      "kind": "natural",
+      "question": "How does the online reports screen start the batch report job?",
+      "expected": [
+        {
+          "member": "app/cbl/CORPT00C.cbl",
+          "line_start": 498,
+          "line_end": 508
+        },
+        {
+          "member": "app/cbl/CORPT00C.cbl",
+          "line_start": 515,
+          "line_end": 523
+        }
+      ],
+      "why": "Loops over in-program JCL lines and writes each to the JOBS transient data queue for the internal reader."
+    },
+    {
+      "id": "Q11",
+      "kind": "natural",
+      "question": "Inside the transaction report program, how are records outside the requested date range skipped?",
+      "expected": [
+        {
+          "member": "app/cbl/CBTRN03C.cbl",
+          "line_start": 173,
+          "line_end": 178
+        }
+      ],
+      "why": "Compares the first 10 characters of the processing timestamp to the start and end dates and skips to the next sentence otherwise."
+    },
+    {
+      "id": "Q12",
+      "kind": "natural",
+      "question": "Where does the statement program use self-modifying control flow to pick which file to open next?",
+      "expected": [
+        {
+          "member": "app/cbl/CBSTM03A.CBL",
+          "line_start": 298,
+          "line_end": 314
+        }
+      ],
+      "why": "Evaluates the current file name and uses ALTER and GO TO to redirect the open paragraph."
+    },
+    {
+      "id": "Q13",
+      "kind": "natural",
+      "question": "How is the timestamp on exported customer data records built?",
+      "expected": [
+        {
+          "member": "app/cbl/CBEXPORT.cbl",
+          "line_start": 172,
+          "line_end": 195
+        }
+      ],
+      "why": "Accepts the system date and time and strings them into a date, time and 26-character timestamp ending in .00."
+    },
+    {
+      "id": "Q14",
+      "kind": "natural",
+      "question": "What does the data import job do with a record type it does not recognize?",
+      "expected": [
+        {
+          "member": "app/cbl/CBIMPORT.cbl",
+          "line_start": 283,
+          "line_end": 284
+        },
+        {
+          "member": "app/cbl/CBIMPORT.cbl",
+          "line_start": 425,
+          "line_end": 434
+        }
+      ],
+      "why": "The other branch counts it, fills an error record with an unknown-type message and writes it to the error file."
+    },
+    {
+      "id": "Q15",
+      "kind": "natural",
+      "question": "Which social security number prefixes are rejected when a customer is edited?",
+      "expected": [
+        {
+          "member": "app/cbl/COACTUPC.cbl",
+          "line_start": 121,
+          "line_end": 123
+        },
+        {
+          "member": "app/cbl/COACTUPC.cbl",
+          "line_start": 2447,
+          "line_end": 2464
+        }
+      ],
+      "why": "First-part values 000, 666 and 900-999 are defined as invalid and produce an input error with a message."
+    },
+    {
+      "id": "Q16",
+      "kind": "natural",
+      "question": "During an account update, what happens if the account save succeeds but the customer save fails?",
+      "expected": [
+        {
+          "member": "app/cbl/COACTUPC.cbl",
+          "line_start": 4095,
+          "line_end": 4103
+        }
+      ],
+      "why": "Sets the update-failed flag and issues a syncpoint rollback so the account rewrite is undone."
+    },
+    {
+      "id": "Q17",
+      "kind": "natural",
+      "question": "How does the card update screen detect that someone else changed the card between display and save?",
+      "expected": [
+        {
+          "member": "app/cbl/COCRDUPC.cbl",
+          "line_start": 1453,
+          "line_end": 1457
+        },
+        {
+          "member": "app/cbl/COCRDUPC.cbl",
+          "line_start": 1498,
+          "line_end": 1520
+        }
+      ],
+      "why": "After locking, compares current record fields to the saved old values and flags changed data, refreshing the old values."
+    },
+    {
+      "id": "Q18",
+      "kind": "natural",
+      "question": "What happens on the card list screen when a user selects more than one row?",
+      "expected": [
+        {
+          "member": "app/cbl/COCRDLIC.cbl",
+          "line_start": 1079,
+          "line_end": 1095
+        }
+      ],
+      "why": "Tallies select and update action codes and raises an input error marking the rows if more than one is present."
+    },
+    {
+      "id": "Q19",
+      "kind": "natural",
+      "question": "How is a regular user stopped from choosing an admin-only option on the main menu?",
+      "expected": [
+        {
+          "member": "app/cbl/COMEN01C.cbl",
+          "line_start": 136,
+          "line_end": 143
+        }
+      ],
+      "why": "If the user type is regular and the option is typed admin, it sets the error flag and shows a no-access message."
+    },
+    {
+      "id": "Q20",
+      "kind": "natural",
+      "question": "What message does a user see when adding a login ID that already exists?",
+      "expected": [
+        {
+          "member": "app/cbl/COUSR01C.cbl",
+          "line_start": 260,
+          "line_end": 266
+        }
+      ],
+      "why": "A duplicate key or record response from the write produces the already-exists message."
+    },
+    {
+      "id": "Q21",
+      "kind": "natural",
+      "question": "Does the user update screen write to the file when nothing was actually changed?",
+      "expected": [
+        {
+          "member": "app/cbl/COUSR02C.cbl",
+          "line_start": 219,
+          "line_end": 243
+        }
+      ],
+      "why": "Field-by-field compares set a modified flag; without it, the program shows a please-modify message and does not rewrite."
+    },
+    {
+      "id": "Q22",
+      "kind": "natural",
+      "question": "To display an account, in what order are the related records looked up?",
+      "expected": [
+        {
+          "member": "app/cbl/COACTVWC.cbl",
+          "line_start": 687,
+          "line_end": 718
+        }
+      ],
+      "why": "Reads the card cross-reference by account, then the account master, then the customer, exiting early when one is missing."
+    },
+    {
+      "id": "Q23",
+      "kind": "natural",
+      "question": "How is a card purchase authorization approved or declined based on available credit?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+          "line_start": 664,
+          "line_end": 683
+        }
+      ],
+      "why": "Available amount is limit minus balance from the summary segment or account master, and a larger amount declines as insufficient funds."
+    },
+    {
+      "id": "Q24",
+      "kind": "natural",
+      "question": "How does the batch purge decide that a pending authorization has expired?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl",
+          "line_start": 280,
+          "line_end": 296
+        }
+      ],
+      "why": "Recovers the date from its complemented form, computes age in days, and flags deletion while adjusting summary counters."
+    },
+    {
+      "id": "Q25",
+      "kind": "natural",
+      "question": "When a fraud report is saved to the relational table, how is a report that already exists handled?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl",
+          "line_start": 199,
+          "line_end": 204
+        },
+        {
+          "member": "app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl",
+          "line_start": 221,
+          "line_end": 229
+        }
+      ],
+      "why": "A duplicate-key SQLCODE -803 on insert falls through to an update of the fraud flag and report date."
+    },
+    {
+      "id": "Q26",
+      "kind": "natural",
+      "question": "How does the authorization detail screen toggle a transaction between flagged and not flagged as fraud?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl",
+          "line_start": 236,
+          "line_end": 242
+        }
+      ],
+      "why": "If already confirmed it sets removed and the remove action; otherwise it sets confirmed and the report action."
+    },
+    {
+      "id": "Q27",
+      "kind": "natural",
+      "question": "On the transaction type update screen, what happens if the row being saved is not in the table?",
+      "expected": [
+        {
+          "member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl",
+          "line_start": 1555,
+          "line_end": 1560
+        },
+        {
+          "member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl",
+          "line_start": 1596,
+          "line_end": 1602
+        }
+      ],
+      "why": "An update returning SQLCODE +100 performs an insert of the type and description, giving upsert behavior."
+    },
+    {
+      "id": "Q28",
+      "kind": "natural",
+      "question": "What happens when deleting a transaction type that still has categories attached?",
+      "expected": [
+        {
+          "member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl",
+          "line_start": 1638,
+          "line_end": 1649
+        },
+        {
+          "member": "app/app-transaction-type-db2/cbl/COTRTLIC.cbl",
+          "line_start": 1914,
+          "line_end": 1925
+        }
+      ],
+      "why": "SQLCODE -532 produces a please-delete-child-records-first message rather than deleting."
+    },
+    {
+      "id": "Q29",
+      "kind": "natural",
+      "question": "How is the reply built by the message-queue service that returns the system date?",
+      "expected": [
+        {
+          "member": "app/app-vsam-mq/cbl/CODATE01.cbl",
+          "line_start": 343,
+          "line_end": 360
+        }
+      ],
+      "why": "Gets absolute time, formats date and time, strings them into the reply message and performs the put."
+    },
+    {
+      "id": "Q30",
+      "kind": "natural",
+      "question": "In the daily transaction verification job, what happens when a card cannot be verified?",
+      "expected": [
+        {
+          "member": "app/cbl/CBTRN01C.cbl",
+          "line_start": 173,
+          "line_end": 184
+        }
+      ],
+      "why": "If the cross-reference lookup fails it displays a skipping message for the transaction and does not read the account."
+    },
+    {
+      "id": "Q31",
+      "kind": "identifier",
+      "question": "What does the paragraph 1400-COMPUTE-FEES in CBACT04C actually do?",
+      "expected": [
+        {
+          "member": "app/cbl/CBACT04C.cbl",
+          "line_start": 518,
+          "line_end": 520
+        }
+      ],
+      "why": "It is a stub with a to-be-implemented comment and an EXIT, so no fees are computed."
+    },
+    {
+      "id": "Q32",
+      "kind": "identifier",
+      "question": "Where are ACCT-CURR-CYC-CREDIT and ACCT-CURR-CYC-DEBIT updated during transaction posting, and what selects between them?",
+      "expected": [
+        {
+          "member": "app/cbl/CBTRN02C.cbl",
+          "line_start": 547,
+          "line_end": 552
+        }
+      ],
+      "why": "Adds the amount to the current balance and to cycle credit when non-negative, otherwise to cycle debit."
+    },
+    {
+      "id": "Q33",
+      "kind": "identifier",
+      "question": "Where is FICO-RANGE-IS-VALID defined and how is it used?",
+      "expected": [
+        {
+          "member": "app/cbl/COACTUPC.cbl",
+          "line_start": 848,
+          "line_end": 849
+        },
+        {
+          "member": "app/cbl/COACTUPC.cbl",
+          "line_start": 2514,
+          "line_end": 2530
+        }
+      ],
+      "why": "An 88-level for 300 through 850 tested by the score edit, which raises an error message when out of range."
+    },
+    {
+      "id": "Q34",
+      "kind": "identifier",
+      "question": "What does the CDEMO-PGM-CONTEXT field in the common commarea mean?",
+      "expected": [
+        {
+          "member": "app/cpy/COCOM01Y.cpy",
+          "line_start": 29,
+          "line_end": 31
+        }
+      ],
+      "why": "A one-digit field with 88 levels for first entry (0) and re-entry (1)."
+    },
+    {
+      "id": "Q35",
+      "kind": "identifier",
+      "question": "How is PA-AUTHORIZATION-KEY structured and how are its values derived?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/cpy/CIPAUDTY.cpy",
+          "line_start": 19,
+          "line_end": 21
+        },
+        {
+          "member": "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+          "line_start": 874,
+          "line_end": 875
+        }
+      ],
+      "why": "Two packed fields hold date and time computed as nines complements so newer authorizations sort first."
+    },
+    {
+      "id": "Q36",
+      "kind": "identifier",
+      "question": "What does 1290-CROSS-EDITS do in COTRTLIC?",
+      "expected": [
+        {
+          "member": "app/app-transaction-type-db2/cbl/COTRTLIC.cbl",
+          "line_start": 1239,
+          "line_end": 1268
+        }
+      ],
+      "why": "When a filter is valid it counts matching rows and raises a no-records error when the count is zero."
+    },
+    {
+      "id": "Q37",
+      "kind": "identifier",
+      "question": "What does REPOSITION-AUTHORIZATIONS do in COPAUS0C?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl",
+          "line_start": 488,
+          "line_end": 519
+        }
+      ],
+      "why": "Restores the saved key and issues a qualified get-next-within-parent on the detail segment to resume paging."
+    },
+    {
+      "id": "Q38",
+      "kind": "identifier",
+      "question": "In 1300-POPUL-ACCT-RECORD of CBACT01C, what is written when ACCT-CURR-CYC-DEBIT is zero?",
+      "expected": [
+        {
+          "member": "app/cbl/CBACT01C.cbl",
+          "line_start": 236,
+          "line_end": 238
+        }
+      ],
+      "why": "Moves a hard-coded 2525.00 to the output debit field when the input is zero."
+    },
+    {
+      "id": "Q39",
+      "kind": "identifier",
+      "question": "What does 8500-READTRNX-READ do in CBSTM03A?",
+      "expected": [
+        {
+          "member": "app/cbl/CBSTM03A.CBL",
+          "line_start": 818,
+          "line_end": 852
+        }
+      ],
+      "why": "Loads transactions into the in-memory card and transaction table via the file subroutine until end of file, then moves on to the next file."
+    },
+    {
+      "id": "Q40",
+      "kind": "structure",
+      "question": "In the daily posting job, which program runs and what is the output dataset and record length for rejected transactions?",
+      "expected": [
+        {
+          "member": "app/jcl/POSTTRAN.jcl",
+          "line_start": 23,
+          "line_end": 38
+        }
+      ],
+      "why": "Step runs CBTRN02C and the DALYREJS DD creates a new GDG generation with LRECL 430."
+    },
+    {
+      "id": "Q41",
+      "kind": "structure",
+      "question": "Which job merges system-generated transactions with the backup and loads the result into the transaction master?",
+      "expected": [
+        {
+          "member": "app/jcl/COMBTRAN.jcl",
+          "line_start": 22,
+          "line_end": 48
+        }
+      ],
+      "why": "A sort concatenates the backup and system generations by transaction ID and IDCAMS REPRO loads the VSAM file."
+    },
+    {
+      "id": "Q42",
+      "kind": "structure",
+      "question": "How does the statement job re-key the transaction file by card number and transaction ID?",
+      "expected": [
+        {
+          "member": "app/jcl/CREASTMT.JCL",
+          "line_start": 29,
+          "line_end": 30
+        },
+        {
+          "member": "app/jcl/CREASTMT.JCL",
+          "line_start": 52,
+          "line_end": 55
+        }
+      ],
+      "why": "Defines a KSDS with a 32-byte key and sorts by card then ID, moving the card number to the front of the record."
+    },
+    {
+      "id": "Q43",
+      "kind": "structure",
+      "question": "Which VSAM definition lets the card cross-reference file be read by account number?",
+      "expected": [
+        {
+          "member": "app/jcl/XREFFILE.jcl",
+          "line_start": 72,
+          "line_end": 78
+        }
+      ],
+      "why": "An alternate index relates to the base cluster on an 11-byte key at offset 25 with non-unique keys."
+    },
+    {
+      "id": "Q44",
+      "kind": "structure",
+      "question": "Where is the sign-on screen's password field defined so that typed characters are not displayed?",
+      "expected": [
+        {
+          "member": "app/bms/COSGN00.bms",
+          "line_start": 175,
+          "line_end": 180
+        }
+      ],
+      "why": "The BMS field has the DRK attribute, unprotected, with length 8."
+    },
+    {
+      "id": "Q45",
+      "kind": "structure",
+      "question": "How is the pending authorization database hierarchy defined in IMS?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd",
+          "line_start": 18,
+          "line_end": 37
+        }
+      ],
+      "why": "HIDAM DBD with the summary root segment keyed on account and a detail child keyed on an 8-byte field."
+    },
+    {
+      "id": "Q46",
+      "kind": "structure",
+      "question": "How is the expired authorization purge launched as an IMS batch job, with which PSB and parameter card?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl",
+          "line_start": 24,
+          "line_end": 25
+        },
+        {
+          "member": "app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl",
+          "line_start": 36,
+          "line_end": 37
+        },
+        {
+          "member": "app/app-authorization-ims-db2-mq/ims/PSBPAUTB.psb",
+          "line_start": 17,
+          "line_end": 20
+        }
+      ],
+      "why": "Region controller runs BMP with the program and PSB, SYSIN carries the parameters, and the PSB grants the two segments."
+    },
+    {
+      "id": "Q47",
+      "kind": "structure",
+      "question": "What is the DB2 relationship between transaction types and their categories, including delete behavior?",
+      "expected": [
+        {
+          "member": "app/app-transaction-type-db2/ddl/TRNTYCAT.ddl",
+          "line_start": 5,
+          "line_end": 7
+        },
+        {
+          "member": "app/app-transaction-type-db2/ctl/DB2CREAT.ctl",
+          "line_start": 96,
+          "line_end": 99
+        }
+      ],
+      "why": "The category table has a foreign key on type code referencing the type table with ON DELETE RESTRICT."
+    },
+    {
+      "id": "Q48",
+      "kind": "structure",
+      "question": "What is the input record format for the batch job that maintains the DB2 transaction type table, and how are the action codes applied?",
+      "expected": [
+        {
+          "member": "app/app-transaction-type-db2/jcl/MNTTRDB2.jcl",
+          "line_start": 8,
+          "line_end": 18
+        },
+        {
+          "member": "app/app-transaction-type-db2/cbl/COBTUPDT.cbl",
+          "line_start": 110,
+          "line_end": 129
+        }
+      ],
+      "why": "Column 1 action, columns 2-3 type, columns 4-53 description; the program dispatches A, U, D and treats * as a comment."
+    },
+    {
+      "id": "Q49",
+      "kind": "structure",
+      "question": "What request does the MQ account inquiry program accept, and how does it reply to invalid requests?",
+      "expected": [
+        {
+          "member": "app/app-vsam-mq/cbl/COACCT01.cbl",
+          "line_start": 109,
+          "line_end": 112
+        },
+        {
+          "member": "app/app-vsam-mq/cbl/COACCT01.cbl",
+          "line_start": 393,
+          "line_end": 404
+        },
+        {
+          "member": "app/app-vsam-mq/cbl/COACCT01.cbl",
+          "line_start": 448,
+          "line_end": 456
+        }
+      ],
+      "why": "A 4-byte function and 11-digit key; INQA with a positive key reads the account, otherwise an invalid-parameters reply is put."
+    },
+    {
+      "id": "Q50",
+      "kind": "structure",
+      "question": "What is the field layout of the pending authorization request message?",
+      "expected": [
+        {
+          "member": "app/app-authorization-ims-db2-mq/cpy/CCPAURQY.cpy",
+          "line_start": 19,
+          "line_end": 36
+        }
+      ],
+      "why": "Copybook lists date, time, card, type, expiry, amount, merchant and transaction ID fields with their sizes."
+    }
+  ]
+}

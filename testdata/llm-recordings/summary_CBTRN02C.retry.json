@@ -1,0 +1,6 @@
+{
+  "model" : "gpt-oss-32k:latest",
+  "tokens_in" : 10275,
+  "tokens_out" : 990,
+  "text" : "{\"purpose\":\"Processes a daily transaction file, validates each record against cross‑reference and account data, posts valid transactions to a transaction file, updates account and category balances, and records rejected transactions.\",\"inputs\":[\"DALYTRAN-FILE\",\"XREF-FILE\",\"ACCOUNT-FILE\",\"TCATBAL-FILE\"],\"outputs\":[\"TRANSACT-FILE\",\"DALYREJS-FILE\"],\"side_effects\":[\"Updates account balances in ACCOUNT-FILE\",\"Updates transaction category balances in TCATBAL-FILE\",\"Writes transaction records to TRANSACT-FILE\",\"Writes rejected records to DALYREJS-FILE\"],\"role\":\"batch\",\"error_handling\":\"Uses APPL-RESULT and IO-STATUS to detect file errors, displays messages, and calls external ABEND routine CEE3ABD on fatal errors.\",\"evidence\":[{\"line_start\":202,\"line_end\":219,\"claim\":\"Main loop reads daily file and processes each transaction.\"},{\"line_start\":345,\"line_end\":369,\"claim\":\"Reads next record from DALYTRAN-FILE and sets EOF flag.\"},{\"line_start\":2000,\"line_end\":2500,\"claim\":\"Posts transaction, updates balances, writes transaction or reject record.\"}]}"
+}

@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.Error;
+import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ public final class ArtifactValidator {
     public record Facts(int lineMin, int lineMax, Set<String> paragraphs, Set<String> dataItems) {}
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Map<String, JsonSchema> SCHEMAS = new ConcurrentHashMap<>();
+    private static final Map<String, Schema> SCHEMAS = new ConcurrentHashMap<>();
 
     private ArtifactValidator() {}
 
@@ -43,16 +43,16 @@ public final class ArtifactValidator {
         }
     }
 
-    private static JsonSchema schema(String kind) {
-        return SCHEMAS.computeIfAbsent(kind, k -> JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(schemaText(k)));
+    private static Schema schema(String kind) {
+        return SCHEMAS.computeIfAbsent(kind, k -> SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(schemaText(k)));
     }
 
     /** @return the validated JSON, with names the AST does not know moved aside instead of trusted */
     public static ObjectNode validate(String kind, String text, Facts facts) {
         JsonNode n = parse(text);
-        Set<ValidationMessage> errors = schema(kind).validate(n);
+        List<Error> errors = schema(kind).validate(n);
         if (!errors.isEmpty()) {
-            throw new Invalid("schema: " + errors.stream().limit(5).map(ValidationMessage::getMessage).collect(Collectors.joining("; ")));
+            throw new Invalid("schema: " + errors.stream().limit(5).map(Error::getMessage).collect(Collectors.joining("; ")));
         }
         ObjectNode o = (ObjectNode) n;
         switch (kind) {

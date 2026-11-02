@@ -1,0 +1,6 @@
+{
+  "model" : "gpt-oss-32k:latest",
+  "tokens_in" : 10200,
+  "tokens_out" : 1517,
+  "text" : "{\"items\":[{\"feature\":\"REDEFINES (TWO-BYTES-ALPHA)\",\"line_start\":134,\"line_end\":137,\"guidance\":\"Handle overlapping memory layouts carefully; map the binary and alpha representations to appropriate Java types, ensuring correct byte order.\"},{\"feature\":\"REDEFINES (DB2-FORMAT-TS)\",\"line_start\":160,\"line_end\":174,\"guidance\":\"Map the DB2 timestamp format to Java's timestamp representation, preserving field boundaries.\"},{\"feature\":\"Dynamic CALL to external program\",\"line_start\":711,\"line_end\":711,\"guidance\":\"Implement external program invocation via JNI or external process; handle return codes and timing.\"},{\"feature\":\"EBCDIC collation for file I/O\",\"line_start\":26,\"line_end\":32,\"guidance\":\"Use appropriate character encoding (EBCDIC) when reading/writing files; convert to/from Unicode.\"},{\"feature\":\"Date/time format conversion\",\"line_start\":692,\"line_end\":705,\"guidance\":\"Convert COBOL date/time fields to Java's LocalDateTime or similar, following the DB2 format.\"}]}"
+}

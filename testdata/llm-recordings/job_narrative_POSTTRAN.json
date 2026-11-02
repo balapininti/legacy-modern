@@ -1,0 +1,6 @@
+{
+  "model" : "gpt-oss-32k:latest",
+  "tokens_in" : 1042,
+  "tokens_out" : 709,
+  "text" : "{\"job\":\"POSTTRAN\",\"purpose\":\"The POSTTRAN job processes the daily transaction file, creates transaction category balances, and updates the transaction master VSAM dataset. It reads transaction, account, and reference files and writes a new daily reconciliation file.\",\"steps\":[{\"step\":\"STEP15\",\"description\":\"Executes program CBTRN02C to process the daily transaction file, generate category balances, and update the transaction master VSAM.\"}],\"datasets_in\":[\"AWS.M2.CARDDEMO.LOADLIB\",\"AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\",\"AWS.M2.CARDDEMO.DALYTRAN.PS\",\"AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS\",\"AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS\",\"AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS\"],\"datasets_out\":[\"AWS.M2.CARDDEMO.DALYREJS(+1)\"],\"restart_points\":[],\"line_start\":1,\"line_end\":45}"
+}

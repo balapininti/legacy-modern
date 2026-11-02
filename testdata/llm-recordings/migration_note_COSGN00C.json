@@ -1,0 +1,6 @@
+{
+  "model" : "gpt-oss-32k:latest",
+  "tokens_in" : 7634,
+  "tokens_out" : 2214,
+  "text" : "{\"items\":[{\"feature\":\"COMP-3 arithmetic\",\"line_start\":43,\"line_end\":44,\"guidance\":\"Ensure binary COMP-3 numeric fields are converted to Java numeric types (e.g., BigDecimal) and that arithmetic preserves precision and sign.\"},{\"feature\":\"OCCURS DEPENDING ON\",\"line_start\":67,\"line_end\":68,\"guidance\":\"Translate the dynamic array of LINKAGE section into a Java collection (e.g., List<byte[]>) sized by the runtime value of EIBCALEN.\"},{\"feature\":\"EBCDIC collation\",\"line_start\":22,\"line_end\":24,\"guidance\":\"Handle EBCDIC-to-UTF-8 conversion and preserve EBCDIC collation rules for string comparisons; use appropriate charset.\"},{\"feature\":\"Date formats\",\"line_start\":179,\"line_end\":196,\"guidance\":\"Map COBOL CURRENT-DATE and WS-CURDATE-DATA fields to Java LocalDate/LocalTime, and format strings to match the expected output (e.g., MM-DD-YY).\"}]}"
+}

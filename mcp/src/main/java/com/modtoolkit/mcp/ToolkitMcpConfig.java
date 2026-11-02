@@ -70,11 +70,12 @@ public class ToolkitMcpConfig {
     }
 
     static Identity identityOf(ToolContext ctx) {
-        if (ctx != null) {
-            McpSyncServerExchange ex = McpToolUtils.getMcpExchange(ctx).orElse(null);
-            if (ex != null && ex.transportContext() != null && ex.transportContext().get(IDENTITY) instanceof Identity id) {
-                return id;
-            }
+        return identityOf(ctx == null ? null : McpToolUtils.getMcpExchange(ctx).orElse(null));
+    }
+
+    static Identity identityOf(McpSyncServerExchange ex) {
+        if (ex != null && ex.transportContext() != null && ex.transportContext().get(IDENTITY) instanceof Identity id) {
+            return id;
         }
         // stdio: a developer's own process, already trusted by the operating system account running it.
         String user = System.getenv().getOrDefault("TOOLKIT_USER", System.getProperty("user.name", "local"));

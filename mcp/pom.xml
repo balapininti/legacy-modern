@@ -7,6 +7,7 @@
     <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-core</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-retrieval</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-knowledge</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-rulebook</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.ai</groupId><artifactId>spring-ai-starter-mcp-server-webmvc</artifactId></dependency>
     <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-discovery</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>

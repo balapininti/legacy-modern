@@ -1,0 +1,111 @@
+# Mapping rules are data so a client can edit them without a rebuild; `rulebook generate --rules DIR` adds or replaces by id.
+rules:
+  - id: numeric-integer
+    features: [pic-9, pic-s9, display-numeric, comp, binary]
+    cobol: "PIC 9 and S9 with no decimals, DISPLAY or COMP"
+    java: "int up to 9 digits, long up to 18, BigInteger above that"
+    guidance: "Choose by digit count, not by usage. Unsigned PIC 9 still maps to a signed Java type, so validate that it is not negative where the record could not have held it."
+    example: "05 ACCT-ID PIC 9(11). -> long acctId;"
+  - id: comp3-decimal
+    features: [comp-3, packed-decimal, pic-9v99, decimal, rounded]
+    cobol: "COMP-3 and any PIC with an implied decimal V"
+    java: "BigDecimal with explicit scale and RoundingMode"
+    guidance: "Scale comes from the digits after V. ROUNDED means RoundingMode.HALF_UP. No ROUNDED means truncation, RoundingMode.DOWN. Never use double or float: COMPUTE truncates to the receiving field and binary floating point cannot reproduce it."
+    example: "COMPUTE WS-INT = WS-BAL * WS-RATE / 1200 with WS-INT PIC S9(9)V99 -> bal.multiply(rate).divide(new BigDecimal(1200), 2, RoundingMode.DOWN)"
+    conflict:
+      regex: "(?i)\\b(double|float)\\s+\\w*(amount|amt|bal|balance|rate|interest|credit|debit|fee|total)\\w*"
+      message: "existing code holds money in binary floating point, which the rule forbids"
+  - id: pic-x-string
+    features: [pic-x, alphanumeric, trailing-spaces]
+    cobol: "PIC X"
+    java: "String, with documented trailing-space semantics"
+    guidance: "COBOL compares with space padding, so 'AB' equals 'AB   '. Trim on the way in at the boundary and compare trimmed, or the characterization tests will fail on spaces. Record the fixed length in a @Size so an overflow is caught rather than silently truncated."
+    example: "05 CUST-NAME PIC X(25). -> @Size(max = 25) String custName;"
+  - id: level-88
+    features: [88, level-88, condition-name]
+    cobol: "88-level condition names"
+    java: "Enum, or boolean predicate method when the values are not a closed set"
+    guidance: "Name the enum after the parent item. THRU ranges become a predicate, not enum constants."
+    example: "88 ACCT-ACTIVE VALUE 'Y'. -> boolean isActive() { return \"Y\".equals(status); }"
+  - id: occurs-list
+    features: [occurs, table, array, odo, occurs-depending-on]
+    cobol: "OCCURS, including OCCURS DEPENDING ON"
+    java: "List with the fixed bound recorded"
+    guidance: "Enforce the OCCURS maximum in a validator: the COBOL table cannot grow past it. For ODO the list size is the DEPENDING ON field, so do not keep both. COBOL subscripts start at 1."
+    example: "05 TAB OCCURS 1 TO 50 DEPENDING ON CNT -> @Size(max = 50) List<Row> tab;"
+  - id: redefines-views
+    features: [redefines, union, overlay]
+    cobol: "REDEFINES"
+    java: "Explicit converter, or one class per view"
+    guidance: "Never model it as two independent fields: they share storage, and a write through one view changes the other. Find which view applies from the code that tests the record type."
+    example: "05 RAW PIC X(8). 05 NUM REDEFINES RAW PIC 9(8). -> a converter between String and long, and one field."
+  - id: group-move
+    features: [group-move, move-corresponding, group]
+    cobol: "MOVE of a group item, MOVE CORRESPONDING"
+    java: "A mapper class"
+    guidance: "A group MOVE is a byte copy with no conversion. Check that the two layouts line up before writing it as field-by-field assignment; where they do not, the COBOL relied on the overlap and the mapper must reproduce that."
+    example: "MOVE WS-CUST TO CUST-OUT -> custMapper.toOutput(cust)"
+  - id: file-vsam-repository
+    features: [file, vsam, ksds, sequential, read, write]
+    cobol: "File I/O and VSAM KSDS"
+    java: "Repository keyed as the file was"
+    guidance: "READ NEXT order is key order, so use an ORDER BY on the same key. A duplicate key on WRITE and a not-found on READ are status codes in COBOL, and are expected control flow, not exceptions to swallow."
+    example: "READ ACCTFILE KEY IS ACCT-ID -> accountRepository.findById(acctId)"
+    conflict:
+      regex: "\\bJdbcTemplate\\b"
+      message: "existing code uses JdbcTemplate where the rule proposes Spring Data repositories"
+      keep_existing_note: "Keep JdbcTemplate; the keying and ordering guidance still applies."
+  - id: cics-rest
+    features: [cics, cics-link, cics-xctl, commarea, transaction]
+    cobol: "CICS transaction, LINK, XCTL, COMMAREA"
+    java: "REST endpoint plus a service, with the COMMAREA as a request and response DTO"
+    guidance: "LINK is a method call that returns. XCTL does not return: model it as the next step in a flow, not a nested call. Pseudo-conversational RETURN TRANSID state moves to the client or to a session store; do not hold it in the service."
+    example: "EXEC CICS LINK PROGRAM('COACTVWC') COMMAREA(WS-COMM) -> accountViewService.view(request)"
+  - id: bms-angular
+    features: [bms, map, screen, dfhmdf]
+    cobol: "BMS map"
+    java: "Angular component"
+    guidance: "Each DFHMDF with a name is a form control. ATTRB=(UNPROT) is editable, ASKIP read-only, NUM numeric. Field length becomes maxlength. Validations live in the program, not the map: get them with screen_flow and business_rules."
+    example: "USERID DFHMDF POS=(19,43),LENGTH=8,ATTRB=(UNPROT,IC) -> <input formControlName=\"userId\" maxlength=\"8\" autofocus>"
+  - id: jcl-batch
+    features: [jcl, job, step, cond, batch]
+    cobol: "JCL job"
+    java: "Spring Batch job with steps mapped 1:1"
+    guidance: "Keep step names so a run can be compared with the mainframe job. COND=(4,LT) means skip when 4 is less than an earlier return code: write it as a JobExecutionDecider and test both directions, since the sense is the reverse of what it reads like."
+    example: "//STEP15 EXEC PGM=CBTRN02C -> new StepBuilder(\"STEP15\", repo)"
+  - id: sort-step
+    features: [sort, merge, dfsort]
+    cobol: "SORT and MERGE"
+    java: "A batch step, or ORDER BY when the data is in a table"
+    guidance: "COBOL SORT is stable only when told so. EBCDIC order differs from ASCII: digits sort after letters. See the collation rule."
+    example: "SORT WORK ON ASCENDING KEY K -> ORDER BY k"
+  - id: gdg-versioning
+    features: [gdg, generation, generation-data-group, relative-generation]
+    cobol: "GDG relative generations"
+    java: "Versioned file naming"
+    guidance: "(+1) creates the next generation, (0) is the latest, (-1) the one before. Within one job (+1) refers to one file however many steps name it, and the base only advances at job end."
+    example: "DSN=PROD.TRANS(+1) -> files.nextVersion(\"PROD.TRANS\", jobId)"
+  - id: ebcdic-collation
+    features: [ebcdic, collation, sort-order, compare]
+    cobol: "EBCDIC collation"
+    java: "An explicit comparator or database collation"
+    guidance: "In EBCDIC lower case sorts before upper case and letters before digits, the reverse of ASCII. Every string range comparison and ORDER BY on mixed data is affected."
+    example: "IF WS-CODE > 'Z' -> ebcdic.compare(code, \"Z\") > 0"
+  - id: date-formats
+    features: [date, yymmdd, julian, century]
+    cobol: "YYMMDD, Julian YYDDD, and century windows"
+    java: "java.time with an explicit converter per format"
+    guidance: "Find the century window in the code before converting. A date of all zeros or all nines is a marker, not a date, so keep it from reaching LocalDate."
+    example: "PIC 9(6) YYMMDD -> DateTimeFormatter.ofPattern(\"yyMMdd\") plus the window"
+  - id: dynamic-call
+    features: [dynamic-call, call, cancel]
+    cobol: "CALL through a variable, and CANCEL"
+    java: "A Map of named handlers"
+    guidance: "CANCEL resets the called program's WORKING-STORAGE. A called program without it keeps state between calls, which a Spring singleton will reproduce only by accident. Make that state explicit."
+    example: "CALL WS-PGM USING X -> handlers.get(pgm).handle(x)"
+  - id: sql-jpa
+    features: [db2, sql, exec-sql, cursor, sqlcode]
+    cobol: "EXEC SQL, cursors and SQLCODE"
+    java: "Spring Data JPA or the client's chosen persistence layer"
+    guidance: "SQLCODE +100 is not-found and is normal flow: map it to Optional.empty or end of a stream, not an exception. A cursor FETCH loop maps to a paged or streamed query."
+    example: "SELECT ... IF SQLCODE = 100 -> repository.findById(id).isEmpty()"
