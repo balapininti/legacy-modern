@@ -129,7 +129,7 @@ function layered(nodes: string[], edges: GraphEdge[], root: string): Map<string,
               @for (e of visibleEdges(); track $index) {
                 <tr>
                   <td>@if (view() === 'calls') { <a [routerLink]="['/programs', e.source]">{{ e.source }}</a> } @else { {{ e.source }} }</td>
-                  <td class="muted">{{ e.type }}</td>
+                  <td class="muted nowrap">{{ e.type }}</td>
                   <td>@if (view() === 'calls') { <a [routerLink]="['/programs', e.target]">{{ e.target }}</a> } @else { {{ e.target }} }</td>
                   <td class="num">{{ e.line }}</td>
                 </tr>
