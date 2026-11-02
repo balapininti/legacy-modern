@@ -208,6 +208,8 @@ final class FactWriter {
             if (dst == null) continue; // A program held in a variable that never gets a literal: no honest edge exists.
             Map<String, Object> a = new HashMap<>();
             a.put("via", "CICS " + c.command());
+            // A name held in a variable is a may-call: every literal that reaches the variable is a possible target.
+            a.put("mode", c.attrs().values().stream().anyMatch(v -> v.equalsIgnoreCase("'" + c.resourceName() + "'") || v.equalsIgnoreCase("\"" + c.resourceName() + "\"")) ? "static" : "dynamic");
             if (c.attrs().containsKey("COMMAREA")) a.put("commarea", c.attrs().get("COMMAREA").replaceAll("\\(.*", "").strip().toUpperCase(Locale.ROOT));
             edges.add(new Edge(me, dst, type, programId, mem.id(c.loc()), c.loc().line(), a));
         }

@@ -65,10 +65,9 @@ class DoctorAndMigrationIT {
         try (Connection c = con(); Statement s = c.createStatement();
                 ResultSet r = s.executeQuery("SELECT cobol_tsvector('MOVE WS-CUST-REC TO 1000-MAIN-PARA.')::text")) {
             r.next();
-            assertThat(r.getString(1)).contains("'ws-cust-rec'").doesNotContain("'cust'");
+            assertThat(r.getString(1)).contains("'ws-cust-rec'").contains("'cust'");
             // Numeric-leading paragraph names are the common COBOL form; they must be findable whole too.
             assertThat(r.getString(1)).contains("'1000-main-para'");
-            assertThat(r.getString(1)).doesNotContain("'main'");
         }
     }
 

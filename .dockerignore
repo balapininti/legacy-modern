@@ -1,0 +1,8 @@
+.git
+.cache
+.tools
+**/node_modules
+**/target
+third_party/src
+ui/dist
+ui/e2e/screenshots

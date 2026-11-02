@@ -1,2 +1,4 @@
 # group:artifact  reason. Dependencies required by the Spring stack with no permissive replacement.
 jakarta.annotation:jakarta.annotation-api  EPL-2.0 OR GPL-2.0 with Classpath Exception; required by Spring. See ADR 0003.
+com.modtoolkit.vendor:koopa-cobol-parser  BSD, verified from third_party/LICENSE.koopa; vendored, so its POM carries no license. See ADR 0006.
+com.modtoolkit.vendor:proleap-cobol-parser  MIT, verified from third_party/LICENSE.proleap; vendored. See ADR 0001.

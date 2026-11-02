@@ -103,6 +103,12 @@ class NormalizeClassifyTest {
     }
 
     @Test
+    void aReadmeWithCodeSamplesIsNotPli() {
+        String md = "# The Authorization Module\n\nThis module handles pending authorizations for the online system and more.\n\n```sql\nDECLARE C1 CURSOR FOR SELECT A;\nSET X = 1;\nSET Y = 2;\n/* a comment */\n```\n\n## Usage\n\nSee the [guide](http://example.com/guide) for details on how it is all put together.\n";
+        assertThat(type(md)).isEqualTo(MemberType.UNKNOWN);
+    }
+
+    @Test
     void aStrayNulInLongTextIsStillText() {
         String pli = " /* SIST ENDRET PROD */\n DCL A CHAR(1);\n".repeat(50);
         byte[] b = (pli.substring(0, 100) + "\u0000" + pli.substring(100)).getBytes(StandardCharsets.UTF_8);

@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -38,7 +39,7 @@ public class HybridSearch {
         String mode = "lexical";
         if (embedder != null && hasVectors(embedder.model())) {
             try {
-                sem = semantic(embedder.embed(List.of(query)).get(0), embedder, kinds);
+                sem = semantic(embedder.embed(List.of(embedder.asQuery(query))).get(0), embedder, kinds);
                 mode = "hybrid";
             } catch (RuntimeException e) {
                 // The search box must still work while the embedding endpoint is down.
@@ -46,7 +47,7 @@ public class HybridSearch {
                 mode = "lexical (embedding endpoint unavailable)";
             }
         }
-        return new Result(fuse(lex, sem, limit), mode);
+        return new Result(fuse(lex, sem, limit, query), mode);
     }
 
     private boolean hasVectors(String model) {
@@ -74,14 +75,39 @@ public class HybridSearch {
     }
 
     static List<SearchHit> fuse(List<SearchHit> lexical, List<SearchHit> semantic, int limit) {
+        return fuse(lexical, semantic, limit, "");
+    }
+
+    /** What a question says it wants: a job, a screen, a table definition. Each word points at a kind of source. */
+    private static final Pattern ASKS_JOB = Pattern.compile("(?i)\\b(jobs?|jcl|dataset|gdg|proc|step|vsam|idcams)\\b");
+    private static final Pattern ASKS_SCREEN = Pattern.compile("(?i)\\b(screens?|maps?|mapset|bms)\\b");
+    private static final Pattern ASKS_DEFINITION = Pattern.compile("(?i)\\b(ddl|tables?|schema|foreign key|dbd|psb|hierarchy|layout|copybooks?)\\b");
+    private static final Pattern NAMES_IDENTIFIER = Pattern.compile("[A-Z0-9]+-[A-Z0-9-]+");
+
+    static double intentBoost(SearchHit h, String query) {
+        String member = h.member() == null ? "" : h.member().toLowerCase(java.util.Locale.ROOT);
+        boolean jcl = "job".equals(h.kind()) || member.matches(".*\\.(jcl|prc|proc)$");
+        boolean map = "map".equals(h.kind()) || member.endsWith(".bms");
+        boolean def = member.matches(".*\\.(ddl|dbd|psb|cpy|dcl)$") || "dictionary".equals(h.kind());
+        double b = 1;
+        if (jcl && ASKS_JOB.matcher(query).find()) b *= 1.8;
+        if (map && ASKS_SCREEN.matcher(query).find()) b *= 1.8;
+        if (def && ASKS_DEFINITION.matcher(query).find()) b *= 1.8;
+        return b;
+    }
+
+    static List<SearchHit> fuse(List<SearchHit> lexical, List<SearchHit> semantic, int limit, String query) {
         Map<String, Double> score = new HashMap<>();
         Map<String, SearchHit> best = new LinkedHashMap<>();
+        // Someone naming an exact identifier wants that identifier, which only the lexical side can promise.
+        double semanticWeight = NAMES_IDENTIFIER.matcher(query).find() ? 0.5 : 1.0;
         for (List<SearchHit> list : List.of(lexical, semantic)) {
+            double weight = list == semantic ? semanticWeight : 1.0;
             for (int rank = 0; rank < list.size(); rank++) {
                 SearchHit h = list.get(rank);
                 if ("rejected".equals(h.status())) continue;
                 String key = key(h);
-                score.merge(key, 1.0 / (RRF_K + rank + 1), Double::sum);
+                score.merge(key, weight * intentBoost(h, query) / (RRF_K + rank + 1), Double::sum);
                 // A reviewed artifact stands for its place over an unreviewed hit on the same lines.
                 SearchHit prior = best.get(key);
                 if (prior == null || ("reviewed".equals(h.status()) && !"reviewed".equals(prior.status()))) best.put(key, h);

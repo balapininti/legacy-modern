@@ -44,6 +44,20 @@ public final class EmbedderFactory {
                 return model;
             }
 
+            private boolean nomic() {
+                return model.toLowerCase(java.util.Locale.ROOT).contains("nomic");
+            }
+
+            @Override
+            public String asDocument(String text) {
+                return nomic() ? "search_document: " + text : text;
+            }
+
+            @Override
+            public String asQuery(String text) {
+                return nomic() ? "search_query: " + text : text;
+            }
+
             @Override
             public int dimension() {
                 return dim;

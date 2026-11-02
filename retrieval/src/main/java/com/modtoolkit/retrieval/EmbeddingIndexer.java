@@ -32,12 +32,13 @@ public class EmbeddingIndexer {
         int done = 0;
         for (String priority : List.of("c.kind IN ('summary','rule','dictionary','job','map')", "c.kind IN ('code','modern') AND coalesce(c.metadata->>'unit','') <> 'copybook'")) {
             while (true) {
-                List<Map<String, Object>> rows = jdbc.queryForList("SELECT c.id, c.text FROM chunk c WHERE (c.embedding IS NULL OR c.embedding_model IS DISTINCT FROM ?) AND " + priority + " ORDER BY c.id LIMIT ?", e.model(), BATCH);
+                List<Map<String, Object>> rows = jdbc.queryForList("SELECT c.id, c.text, c.metadata->>'unit' AS unit, (SELECT m.name FROM member m WHERE m.id = c.member_id) AS member FROM chunk c WHERE (c.embedding IS NULL OR c.embedding_model IS DISTINCT FROM ?) AND " + priority + " ORDER BY c.id LIMIT ?", e.model(), BATCH);
                 if (rows.isEmpty()) break;
                 List<String> texts = new ArrayList<>();
                 for (Map<String, Object> r : rows) {
-                    String t = (String) r.get("text");
-                    texts.add(t.length() > MAX_CHARS ? t.substring(0, MAX_CHARS) : t);
+                    // Where it lives is part of what it means: a paragraph name is often the best summary of the code.
+                    String t = r.get("member") + " " + r.get("unit") + "\n" + r.get("text");
+                    texts.add(e.asDocument(t.length() > MAX_CHARS ? t.substring(0, MAX_CHARS) : t));
                 }
                 List<float[]> vectors = e.embed(texts);
                 if (vectors.size() != rows.size()) throw new IllegalStateException("the embedding endpoint returned " + vectors.size() + " vectors for " + rows.size() + " texts");

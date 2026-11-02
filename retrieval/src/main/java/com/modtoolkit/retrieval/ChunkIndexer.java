@@ -32,7 +32,7 @@ public class ChunkIndexer {
         jdbc.update("DELETE FROM chunk c WHERE c.member_id IS NOT NULL AND c.artifact_id IS NULL AND NOT EXISTS (SELECT 1 FROM member m WHERE m.id = c.member_id AND m.content_hash = c.metadata->>'hash')");
         List<Map<String, Object>> members = jdbc.queryForList("""
                 SELECT m.id, m.path, m.type, m.content_hash FROM member m
-                WHERE m.normalized_text IS NOT NULL AND m.classify_reason <> 'empty' AND m.type <> 'unknown'
+                WHERE m.normalized_text IS NOT NULL AND m.classify_reason <> 'empty' AND m.type NOT IN ('unknown', 'control')
                   AND NOT EXISTS (SELECT 1 FROM chunk c WHERE c.member_id = m.id AND c.artifact_id IS NULL)""");
         int chunks = 0;
         for (Map<String, Object> m : members) {
@@ -55,7 +55,7 @@ public class ChunkIndexer {
                         SELECT q.name, q.line_start, q.line_end, p.program_id FROM paragraph q JOIN program p ON p.id = q.program_id
                         WHERE p.member_id = ? AND q.member_id = ? ORDER BY q.line_start""", id, id);
                 int first = paras.isEmpty() ? lines.size() + 1 : ((Number) paras.get(0).get("line_start")).intValue();
-                if (first > 1) out.add(chunk(id, "code", 1, first - 1, lines, "data division", hash));
+                dataChunks(id, hash, lines, first, out);
                 for (Map<String, Object> q : paras) {
                     out.add(chunk(id, "code", ((Number) q.get("line_start")).intValue(), ((Number) q.get("line_end")).intValue(), lines, q.get("program_id") + "." + q.get("name"), hash));
                 }
@@ -95,6 +95,25 @@ public class ChunkIndexer {
             }
         }
         return out;
+    }
+
+    /**
+     * The part before the first paragraph, one chunk per record. One chunk for a whole data division matches every
+     * search and tells the agent nothing about where to look.
+     */
+    private void dataChunks(long id, String hash, List<String> lines, int first, List<Chunk> out) {
+        List<Map<String, Object>> records = jdbc.queryForList("""
+                SELECT d.name, d.line FROM data_item d JOIN program p ON p.id = d.program_id
+                WHERE p.member_id = ? AND d.owner_member_id = ? AND d.level IN (1, 77) AND d.line < ? ORDER BY d.line""", id, id, first);
+        int start = 1;
+        String unit = "header";
+        for (Map<String, Object> r : records) {
+            int at = ((Number) r.get("line")).intValue();
+            if (at > start) out.add(chunk(id, "code", start, at - 1, lines, unit, hash));
+            start = at;
+            unit = String.valueOf(r.get("name"));
+        }
+        if (first > start) out.add(chunk(id, "code", start, first - 1, lines, unit, hash));
     }
 
     private static Chunk chunk(long id, String kind, int start, int end, List<String> lines, String unit, String hash) {

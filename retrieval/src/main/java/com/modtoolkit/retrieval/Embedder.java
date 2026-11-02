@@ -8,5 +8,15 @@ public interface Embedder {
 
     String model();
 
+    /** Text as this model wants a document embedded; some models need a task prefix. */
+    default String asDocument(String text) {
+        return text;
+    }
+
+    /** Text as this model wants a query embedded. */
+    default String asQuery(String text) {
+        return text;
+    }
+
     int dimension();
 }
