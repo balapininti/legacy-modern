@@ -1,0 +1,49 @@
+client: acme-insurance
+source:
+  root: /data/source          # git checkout or PDS dump
+  refresh: git                # git | manual
+  encoding: auto              # auto | cp037 | cp1047 | utf-8
+  format: auto                # auto | fixed | free
+  dialect: ibm-enterprise     # ibm-enterprise | microfocus
+  include: ["**/*"]
+  exclude: ["**/*.lst"]
+llm:
+  provider: azure-openai      # azure-openai | bedrock | openai | anthropic | openai-compatible
+  endpoint: https://acme-oai.privatelink.openai.azure.com
+  api_key_env: TOOLKIT_LLM_KEY
+  chat_model: gpt-4.1
+  embedding_model: text-embedding-3-large
+  embedding_dim: 3072
+  budget_usd_per_run: 500
+  concurrency: 4
+  redact_pii: true
+  pii_patterns: ["\\b\\d{3}-\\d{2}-\\d{4}\\b"]
+mcp:
+  transport: http             # http | stdio
+  base_url: https://mod-toolkit.acme.internal
+  auth: oidc                  # oidc | token
+zos:
+  enabled: true
+  method: zowe                # zowe | ftp-jes | none
+  host: testlpar.acme.internal
+  user_env: TOOLKIT_ZOS_USER
+  password_env: TOOLKIT_ZOS_PASS
+  job_card: "//TKCAPT JOB (ACCT),'CAPTURE',CLASS=A,MSGCLASS=X"
+  work_hlq: TK.CAPTURE
+target:
+  java: 21
+  spring_boot: "3.4"
+  angular: 19
+  build: maven                # maven | gradle
+  database: postgresql        # postgresql | oracle | sqlserver
+  auth: oidc
+  repo: https://github.com/acme/modernized-app
+  local_path: /data/target    # checkout of the modern repo, indexed by discover --target
+  index_existing: true        # false for a greenfield client
+  package_root: com.acme.policy
+scope:
+  phase1_programs: ["CBACT01C", "CBTRN02C"]
+  phase1_jobs: ["TRANBKP", "POSTTRAN"]
+ui:
+  oidc_issuer: https://login.acme.internal
+  oidc_client_id_env: TOOLKIT_OIDC_CLIENT

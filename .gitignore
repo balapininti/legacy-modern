@@ -1,0 +1,12 @@
+.tools/
+.cache/
+third_party/src/
+target/
+node_modules/
+dist/
+.angular/
+*.iml
+.idea/
+.vscode/
+.DS_Store
+out/
