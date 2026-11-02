@@ -1,0 +1,405 @@
+{
+ "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+ "questions": [
+  {
+   "id": "H01",
+   "kind": "natural",
+   "question": "When the nightly batch posts daily card transactions, what checks cause a transaction to be rejected and what reason is recorded for each?",
+   "expected": [
+    {
+     "member": "app/cbl/CBTRN02C.cbl",
+     "line_start": 380,
+     "line_end": 422
+    }
+   ],
+   "why": "Looks up the card in the cross-reference and the account, rejecting with reasons 100-103 for bad card, missing account, over limit, or expired account."
+  },
+  {
+   "id": "H02",
+   "kind": "natural",
+   "question": "How does the interest calculation fall back when an account's disclosure group has no matching interest rate record?",
+   "expected": [
+    {
+     "member": "app/cbl/CBACT04C.cbl",
+     "line_start": 436,
+     "line_end": 460
+    }
+   ],
+   "why": "On status 23 from the disclosure group read it retries with the DEFAULT group code to get the default interest rate."
+  },
+  {
+   "id": "H03",
+   "kind": "natural",
+   "question": "After a user signs in successfully, how does the system decide which menu they land on, and what happens on a wrong password or unknown user?",
+   "expected": [
+    {
+     "member": "app/cbl/COSGN00C.cbl",
+     "line_start": 221,
+     "line_end": 251
+    }
+   ],
+   "why": "Compares the stored password, then XCTLs to the admin or regular menu by user type; otherwise shows wrong-password or not-found messages."
+  },
+  {
+   "id": "H04",
+   "kind": "identifier",
+   "question": "In the account record copybook, what is the picture clause of ACCT-GROUP-ID?",
+   "expected": [
+    {
+     "member": "app/cpy/CVACT01Y.cpy",
+     "line_start": 15,
+     "line_end": 16
+    }
+   ],
+   "why": "Defines ACCT-GROUP-ID as PIC X(10) at the end of the account record."
+  },
+  {
+   "id": "H05",
+   "kind": "structure",
+   "question": "How is the account master VSAM cluster defined in JCL, in terms of key length and record size?",
+   "expected": [
+    {
+     "member": "app/jcl/ACCTFILE.jcl",
+     "line_start": 36,
+     "line_end": 45
+    }
+   ],
+   "why": "IDCAMS DEFINE CLUSTER with KEYS(11 0), RECORDSIZE(300 300), INDEXED, shareoptions 2 3."
+  },
+  {
+   "id": "H06",
+   "kind": "natural",
+   "question": "What does the online bill payment screen do once the customer confirms payment, and when does it refuse?",
+   "expected": [
+    {
+     "member": "app/cbl/COBIL00C.cbl",
+     "line_start": 197,
+     "line_end": 235
+    }
+   ],
+   "why": "Refuses when the balance is zero or negative, else writes a bill-payment transaction for the full balance and reduces the account balance."
+  },
+  {
+   "id": "H07",
+   "kind": "natural",
+   "question": "How does the card authorization service decide whether to approve or decline a request, and which response reason codes can it return?",
+   "expected": [
+    {
+     "member": "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+     "line_start": 657,
+     "line_end": 696
+    },
+    {
+     "member": "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+     "line_start": 698,
+     "line_end": 718
+    }
+   ],
+   "why": "Declines when the amount exceeds available credit (summary or account), sets response code 00/05 and reason codes by condition."
+  },
+  {
+   "id": "H08",
+   "kind": "natural",
+   "question": "How does the cleanup job for pending authorizations decide that an authorization is old enough to delete?",
+   "expected": [
+    {
+     "member": "app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl",
+     "line_start": 277,
+     "line_end": 299
+    }
+   ],
+   "why": "Converts the stored auth date, computes age in days against the expiry threshold and, if expired, marks for delete and backs out the summary counts."
+  },
+  {
+   "id": "H09",
+   "kind": "identifier",
+   "question": "What do the condition names YYYYMMDD-IN and YYYY-MM-DD-IN under CODATECN-TYPE represent?",
+   "expected": [
+    {
+     "member": "app/cpy/CODATECN.cpy",
+     "line_start": 17,
+     "line_end": 22
+    }
+   ],
+   "why": "Input type flag: value 1 means YYYYMMDD input, value 2 means YYYY-MM-DD input."
+  },
+  {
+   "id": "H10",
+   "kind": "structure",
+   "question": "Which alternate index is defined on the transaction master VSAM file, and on what key position and length?",
+   "expected": [
+    {
+     "member": "app/jcl/TRANIDX.jcl",
+     "line_start": 25,
+     "line_end": 34
+    }
+   ],
+   "why": "DEFINE ALTERNATEINDEX with KEYS(26 304), non-unique, upgraded, related to the transaction KSDS."
+  },
+  {
+   "id": "H11",
+   "kind": "natural",
+   "question": "What happens when an operator reports fraud on an authorization that already has a fraud record in DB2?",
+   "expected": [
+    {
+     "member": "app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl",
+     "line_start": 199,
+     "line_end": 229
+    }
+   ],
+   "why": "Insert is tried first; on duplicate key (-803) it falls into an UPDATE of the fraud flag and report date."
+  },
+  {
+   "id": "H12",
+   "kind": "natural",
+   "question": "How does the online report screen work out the start and end dates for the monthly transaction report?",
+   "expected": [
+    {
+     "member": "app/cbl/CORPT00C.cbl",
+     "line_start": 213,
+     "line_end": 236
+    }
+   ],
+   "why": "Start is first of current month, end is last day of the month computed via integer-of-date arithmetic."
+  },
+  {
+   "id": "H13",
+   "kind": "natural",
+   "question": "When another system asks for account details over a message queue, what does the service reply with, and what if the account does not exist?",
+   "expected": [
+    {
+     "member": "app/app-vsam-mq/cbl/COACCT01.cbl",
+     "line_start": 393,
+     "line_end": 435
+    }
+   ],
+   "why": "For an inquiry function it reads the account file and replies with balance/limits/dates, or an invalid-request message if not found."
+  },
+  {
+   "id": "H14",
+   "kind": "identifier",
+   "question": "What value does WS-MAX-SCREEN-LINES hold in the credit card list program COCRDLIC?",
+   "expected": [
+    {
+     "member": "app/cbl/COCRDLIC.cbl",
+     "line_start": 177,
+     "line_end": 178
+    }
+   ],
+   "why": "Sets the page size of the card list to 7 rows."
+  },
+  {
+   "id": "H15",
+   "kind": "structure",
+   "question": "What is the segment hierarchy of the pending authorization IMS database and what are the sequence keys?",
+   "expected": [
+    {
+     "member": "app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd",
+     "line_start": 18,
+     "line_end": 37
+    }
+   ],
+   "why": "HIDAM database with root PAUTSUM0 keyed on ACCNTID and child PAUTDTL1 keyed on PAUT9CTS, with an index."
+  },
+  {
+   "id": "H16",
+   "kind": "natural",
+   "question": "How does the batch program that maintains the DB2 transaction type table interpret each input line?",
+   "expected": [
+    {
+     "member": "app/app-transaction-type-db2/cbl/COBTUPDT.cbl",
+     "line_start": 109,
+     "line_end": 130
+    }
+   ],
+   "why": "Evaluates the first-column record type: A inserts, U updates, D deletes, * is a comment, anything else is an error."
+  },
+  {
+   "id": "H17",
+   "kind": "natural",
+   "question": "What does the online transaction type maintenance screen tell the user when a delete is blocked because other records depend on the type?",
+   "expected": [
+    {
+     "member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl",
+     "line_start": 1634,
+     "line_end": 1649
+    }
+   ],
+   "why": "On SQLCODE -532 it sets a failure and builds a message asking to delete child records first."
+  },
+  {
+   "id": "H18",
+   "kind": "natural",
+   "question": "How does the transaction type list screen support paging forward and backward while filtering by code or description?",
+   "expected": [
+    {
+     "member": "app/app-transaction-type-db2/cbl/COTRTLIC.cbl",
+     "line_start": 338,
+     "line_end": 368
+    }
+   ],
+   "why": "Two DB2 cursors, ascending and descending on type code, with optional type and description filters."
+  },
+  {
+   "id": "H19",
+   "kind": "identifier",
+   "question": "In CBPAUP0C, what expiry days value is used when P-EXPIRY-DAYS is not numeric?",
+   "expected": [
+    {
+     "member": "app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl",
+     "line_start": 196,
+     "line_end": 200
+    }
+   ],
+   "why": "Defaults the expiry threshold to 5 days when the parameter is not numeric."
+  },
+  {
+   "id": "H20",
+   "kind": "structure",
+   "question": "How is the password input hidden on the sign-on screen map?",
+   "expected": [
+    {
+     "member": "app/bms/COSGN00.bms",
+     "line_start": 174,
+     "line_end": 180
+    }
+   ],
+   "why": "PASSWD field is an 8-character unprotected field with the DRK (dark) attribute."
+  },
+  {
+   "id": "H21",
+   "kind": "natural",
+   "question": "How does the card update screen protect against overwriting changes that someone else made while the user was editing?",
+   "expected": [
+    {
+     "member": "app/cbl/COCRDUPC.cbl",
+     "line_start": 1427,
+     "line_end": 1457
+    },
+    {
+     "member": "app/cbl/COCRDUPC.cbl",
+     "line_start": 1498,
+     "line_end": 1519
+    }
+   ],
+   "why": "Reads the card with UPDATE, compares current values to the originally displayed ones and refuses if they differ."
+  },
+  {
+   "id": "H22",
+   "kind": "natural",
+   "question": "How does the detailed transaction report decide which transactions are included and when does it print totals?",
+   "expected": [
+    {
+     "member": "app/cbl/CBTRN03C.cbl",
+     "line_start": 170,
+     "line_end": 196
+    }
+   ],
+   "why": "Filters by processing date range, writes account totals when the card changes, looks up xref, type and category for each line."
+  },
+  {
+   "id": "H23",
+   "kind": "natural",
+   "question": "What format rules does the manual add-transaction screen enforce on the amount entered?",
+   "expected": [
+    {
+     "member": "app/cbl/COTRN02C.cbl",
+     "line_start": 339,
+     "line_end": 351
+    }
+   ],
+   "why": "Amount must be sign, 8 digits, a decimal point and 2 digits (-99999999.99)."
+  },
+  {
+   "id": "H24",
+   "kind": "identifier",
+   "question": "In paragraph 9600-WRITE-PROCESSING of COTRTUPC, what happens when the UPDATE returns SQLCODE +100?",
+   "expected": [
+    {
+     "member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl",
+     "line_start": 1555,
+     "line_end": 1560
+    }
+   ],
+   "why": "A not-found update falls through to 9700-INSERT-RECORD to insert the row."
+  },
+  {
+   "id": "H25",
+   "kind": "structure",
+   "question": "What referential rule ties the transaction type category table to the transaction type table in DB2?",
+   "expected": [
+    {
+     "member": "app/app-transaction-type-db2/ddl/TRNTYCAT.ddl",
+     "line_start": 1,
+     "line_end": 7
+    }
+   ],
+   "why": "Composite primary key (type code, category) and a foreign key to TRANSACTION_TYPE with ON DELETE RESTRICT."
+  },
+  {
+   "id": "H26",
+   "kind": "natural",
+   "question": "How does the shared date validation logic reject a date of birth?",
+   "expected": [
+    {
+     "member": "app/cpy/CSUTLDPY.cpy",
+     "line_start": 341,
+     "line_end": 370
+    }
+   ],
+   "why": "Converts both dates to integers and flags an error if the entered date is not earlier than today (cannot be in the future)."
+  },
+  {
+   "id": "H27",
+   "kind": "natural",
+   "question": "What common header fields does every record in the branch-migration export file carry before its type-specific data?",
+   "expected": [
+    {
+     "member": "app/cpy/CVEXPORT.cpy",
+     "line_start": 9,
+     "line_end": 19
+    }
+   ],
+   "why": "Record type, timestamp, sequence number, branch id, region code, then a 460-byte data area redefined per record type."
+  },
+  {
+   "id": "H28",
+   "kind": "natural",
+   "question": "How does the statement generation program walk through customers and what does it look up for each one?",
+   "expected": [
+    {
+     "member": "app/cbl/CBSTM03A.CBL",
+     "line_start": 316,
+     "line_end": 329
+    }
+   ],
+   "why": "Loops over cross-reference records, fetching customer and account, writing the statement, then reading that card's transactions."
+  },
+  {
+   "id": "H29",
+   "kind": "identifier",
+   "question": "What does paragraph 8400-UPDATE-SUMMARY in COPAUA0C do to the summary counters when an authorization is declined?",
+   "expected": [
+    {
+     "member": "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+     "line_start": 810,
+     "line_end": 834
+    }
+   ],
+   "why": "Adds to the declined count and amount (approved path updates approved counts and credit balance), then replaces or inserts the summary segment."
+  },
+  {
+   "id": "H30",
+   "kind": "structure",
+   "question": "In the transaction report procedure, how are transactions filtered by date and ordered before the report program runs?",
+   "expected": [
+    {
+     "member": "app/proc/TRANREPT.prc",
+     "line_start": 35,
+     "line_end": 53
+    }
+   ],
+   "why": "A SORT step orders by card number and includes only records between the start and end date parameters."
+  }
+ ]
+}

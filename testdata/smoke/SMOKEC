@@ -1,0 +1,2 @@
+       01 SMOKE-REC.
+           05 SMOKE-ID PIC X(8).

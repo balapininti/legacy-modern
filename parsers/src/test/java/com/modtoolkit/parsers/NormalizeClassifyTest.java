@@ -108,6 +108,18 @@ class NormalizeClassifyTest {
         assertThat(type("/*****/\n/* (C) */\n/*****/\nmsgtxt(ssc1a1)\ntext('hello');\nwait;\n")).isNotEqualTo(MemberType.PLI);
     }
 
+    /** From a real estate: a PL/I include with a COBOL copybook's name took that copybook's place in five programs. */
+    @Test
+    void aDocumentQuotingCicsDefinitionsIsNotACsd() {
+        assertThat(type("# CardDemo\n\nThis application is a sample that shows how the online system is put together.\n\n```\nDEFINE TRANSACTION(CA00) GROUP(CARDDEMO)\n```\n\n- [Guide](http://example.com)\n")).isEqualTo(MemberType.UNKNOWN);
+    }
+
+    @Test
+    void anIncludedPliStructureIsNotACobolCopybook() {
+        assertThat(type("  /* CIOFUNCS.INC */\n     05  IO_AREAS,\n       10  IO_REQ       CHAR(5),\n       10  IO_STAT      CHAR(2),\n       10  IO_LAST      CHAR(2);\n")).isEqualTo(MemberType.PLI);
+        assertThat(type("       05  IO-AREAS.\n         10  IO-REQ  PIC X(5).\n         10  IO-STAT PIC XX.\n         10  IO-LAST PIC XX.\n")).isEqualTo(MemberType.COPYBOOK);
+    }
+
     @Test
     void aReadmeWithCodeSamplesIsNotPli() {
         String md = "# The Authorization Module\n\nThis module handles pending authorizations for the online system and more.\n\n```sql\nDECLARE C1 CURSOR FOR SELECT A;\nSET X = 1;\nSET Y = 2;\n/* a comment */\n```\n\n## Usage\n\nSee the [guide](http://example.com/guide) for details on how it is all put together.\n";

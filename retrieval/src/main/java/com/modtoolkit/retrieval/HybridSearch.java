@@ -19,7 +19,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class HybridSearch {
     private static final Logger log = LoggerFactory.getLogger(HybridSearch.class);
-    private static final int RRF_K = 60;
+    /** Not the usual 60: a top lexical hit was losing to anything both sides ranked middling. Measured, see ADR 0007. */
+    private static final int RRF_K = 5;
     private static final int POOL = 50;
     private static final double REVIEWED_BOOST = 1.5;
 
@@ -100,7 +101,7 @@ public class HybridSearch {
         Map<String, Double> score = new HashMap<>();
         Map<String, SearchHit> best = new LinkedHashMap<>();
         // Someone naming an exact identifier wants that identifier, which only the lexical side can promise.
-        double semanticWeight = NAMES_IDENTIFIER.matcher(query).find() ? 0.5 : 1.0;
+        double semanticWeight = NAMES_IDENTIFIER.matcher(query).find() ? 0.35 : 0.7;
         for (List<SearchHit> list : List.of(lexical, semantic)) {
             double weight = list == semantic ? semanticWeight : 1.0;
             for (int rank = 0; rank < list.size(); rank++) {

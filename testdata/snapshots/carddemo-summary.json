@@ -27,7 +27,7 @@
     "READS" : 113,
     "RECEIVES_MAP" : 21,
     "REDEFINES" : 208,
-    "RUNS_IN" : 344,
+    "RUNS_IN" : 338,
     "SELECTS" : 5,
     "SENDS_MAP" : 26,
     "STARTS_TRANSACTION" : 24,
@@ -51,17 +51,17 @@
     "cobol" : 44,
     "control" : 9,
     "copybook" : 65,
-    "csd" : 8,
+    "csd" : 4,
     "ddl" : 7,
     "jcl" : 56,
     "proc" : 6,
-    "unknown" : 105
+    "unknown" : 109
   },
   "missing_copybooks" : 0,
   "missing_proc_names" : 0,
   "parse_status" : {
-    "inventoried" : 122,
-    "parsed" : 207
+    "inventoried" : 126,
+    "parsed" : 203
   },
   "programs" : 44,
   "static_calls" : {

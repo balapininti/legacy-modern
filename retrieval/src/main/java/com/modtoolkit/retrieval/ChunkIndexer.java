@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ChunkIndexer {
+    private static final int WHOLE_JOB_LINES = 150;
     private static final Logger log = LoggerFactory.getLogger(ChunkIndexer.class);
     private static final int MEMBER_LEVEL_LINE_CAP = 4000;
 
@@ -64,15 +65,21 @@ public class ChunkIndexer {
                 List<Map<String, Object>> steps = jdbc.queryForList("""
                         SELECT s.name, s.line, j.name AS job FROM jcl_step s JOIN jcl_job j ON j.id = s.job_id
                         WHERE j.member_id = ? AND s.line IS NOT NULL AND (s.source_member_id IS NULL OR s.source_member_id = ?) ORDER BY s.line""", id, id);
-                if (steps.isEmpty()) {
-                    out.add(chunk(id, "job", 1, lines.size(), lines, type, hash));
+                // Most jobs read as a unit: what the job is for sits in comments above the steps it describes.
+                if (steps.isEmpty() || lines.size() <= WHOLE_JOB_LINES) {
+                    out.add(chunk(id, "job", 1, lines.size(), lines, steps.isEmpty() ? type : String.valueOf(steps.get(0).get("job")), hash));
                 } else {
-                    int head = ((Number) steps.get(0).get("line")).intValue();
-                    if (head > 1) out.add(chunk(id, "job", 1, head - 1, lines, "job card", hash));
-                    for (int i = 0; i < steps.size(); i++) {
+                    int[] starts = new int[steps.size()];
+                    for (int i = 0; i < starts.length; i++) {
                         int s = ((Number) steps.get(i).get("line")).intValue();
-                        int e = i + 1 < steps.size() ? ((Number) steps.get(i + 1).get("line")).intValue() - 1 : lines.size();
-                        if (e >= s) out.add(chunk(id, "job", s, e, lines, steps.get(i).get("job") + "." + steps.get(i).get("name"), hash));
+                        // A step's comments belong to it.
+                        while (s > 1 && (lines.get(s - 2).startsWith("//*") || lines.get(s - 2).isBlank())) s--;
+                        starts[i] = s;
+                    }
+                    if (starts[0] > 1) out.add(chunk(id, "job", 1, starts[0] - 1, lines, "job card", hash));
+                    for (int i = 0; i < starts.length; i++) {
+                        int e = i + 1 < starts.length ? starts[i + 1] - 1 : lines.size();
+                        if (e >= starts[i]) out.add(chunk(id, "job", starts[i], e, lines, steps.get(i).get("job") + "." + steps.get(i).get("name"), hash));
                     }
                 }
             }

@@ -31,7 +31,7 @@ public class LexicalSearch {
             Map.entry("sign-on", List.of("signon")), Map.entry("signon", List.of("sign-on")), Map.entry("menu", List.of("men")), Map.entry("validate", List.of("edit", "valid")), Map.entry("validated", List.of("edit", "valid")),
             Map.entry("validation", List.of("edit", "valid")), Map.entry("check", List.of("edit", "valid")), Map.entry("checked", List.of("edit", "valid")), Map.entry("update", List.of("rewrite", "upd")), Map.entry("updated", List.of("rewrite", "upd")),
             Map.entry("delete", List.of("del")), Map.entry("total", List.of("tot")), Map.entry("report", List.of("rpt")), Map.entry("reports", List.of("rpt")), Map.entry("reference", List.of("xref")), Map.entry("cross", List.of("xref")),
-            Map.entry("calculate", List.of("compute")), Map.entry("calculated", List.of("compute")), Map.entry("calculation", List.of("compute")), Map.entry("minimum", List.of("min")), Map.entry("maximum", List.of("max")), Map.entry("limit", List.of("lim")));
+            Map.entry("calculate", List.of("compute")), Map.entry("calculated", List.of("compute")), Map.entry("calculation", List.of("compute")), Map.entry("hierarchy", List.of("segm", "parent")), Map.entry("segment", List.of("segm")), Map.entry("database", List.of("dbd")), Map.entry("definition", List.of("define")), Map.entry("defined", List.of("define")), Map.entry("key", List.of("keys")), Map.entry("alternate", List.of("aix", "alternateindex")), Map.entry("minimum", List.of("min")), Map.entry("maximum", List.of("max")), Map.entry("limit", List.of("lim")));
     private static final Pattern TOKEN = Pattern.compile("[a-z0-9]+(?:[-_][a-z0-9]+)*");
     private static final int MAX_TERMS = 16;
 
@@ -65,6 +65,12 @@ public class LexicalSearch {
             score.append(" + CASE WHEN lower(coalesce(m.name,'')) = ? THEN ? ELSE 0 END");
             scoreArgs.add(t.token());
             scoreArgs.add(t.weight() * 1.5);
+            // Asking about a field: where it is declared explains it, and the many places using it do not.
+            if (t.token().matches("[a-z0-9]+[-_][a-z0-9_-]+")) {
+                score.append(" + CASE WHEN c.text ~* ? THEN ? ELSE 0 END");
+                scoreArgs.add("(^|\\n)[ 0-9]*[ ]+" + t.token() + "([^a-z0-9-]|$)");
+                scoreArgs.add(t.weight() * 3);
+            }
         }
         score.append(")");
         where.append(")");
@@ -103,6 +109,7 @@ public class LexicalSearch {
             if (STOP.contains(t)) continue;
             tokens.put(t, true);
             for (String a : ABBREVIATIONS.getOrDefault(t, List.of())) tokens.putIfAbsent(a, false);
+            for (String v : wordForms(t)) tokens.putIfAbsent(v, false);
         }
         List<Term> out = new ArrayList<>();
         for (Map.Entry<String, Boolean> e : tokens.entrySet()) {
@@ -116,6 +123,18 @@ public class LexicalSearch {
         }
         out.sort((a, b) -> Double.compare(b.weight(), a.weight()));
         return out.size() > MAX_TERMS ? out.subList(0, MAX_TERMS) : out;
+    }
+
+    /** The index does not stem, since stemming would mangle identifiers, so the question's word gets its plain forms. */
+    static List<String> wordForms(String t) {
+        if (t.length() < 5 || t.contains("-") || t.contains("_") || t.matches(".*\\d.*")) return List.of();
+        List<String> out = new ArrayList<>();
+        if (t.endsWith("ies")) out.add(t.substring(0, t.length() - 3) + "y");
+        else if (t.endsWith("es")) { out.add(t.substring(0, t.length() - 2)); out.add(t.substring(0, t.length() - 1)); }
+        else if (t.endsWith("s") && !t.endsWith("ss")) out.add(t.substring(0, t.length() - 1));
+        if (t.endsWith("ed")) { out.add(t.substring(0, t.length() - 2)); out.add(t.substring(0, t.length() - 1)); }
+        if (t.endsWith("ing")) { out.add(t.substring(0, t.length() - 3)); out.add(t.substring(0, t.length() - 3) + "e"); }
+        return out;
     }
 
     private List<String> partialIdentifiers(String query, List<Term> found) {

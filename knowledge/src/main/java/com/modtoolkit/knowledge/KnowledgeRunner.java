@@ -33,7 +33,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class KnowledgeRunner {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeRunner.class);
-    private static final ObjectMapper JSON = new ObjectMapper();
+    /** Sorted because this text is hashed into the cache key, and Map.of orders its keys differently in each JVM. */
+    private static final ObjectMapper JSON = new ObjectMapper().configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
     private static final List<String> PROGRAM_KINDS = List.of("summary", "rule", "migration_note");
 
     public record Stats(long runId, String status, int units, int fromCache, int llmCalls, int failed, long tokensIn, long tokensOut, double costUsd) {}

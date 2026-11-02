@@ -44,6 +44,8 @@ public final class Classifier {
         if (JCL_PROC.matcher(raw).find()) return of(MemberType.PROC, "//... PROC or PEND");
         // First statement, not anywhere: a tutorial quoting COBOL in a code block is not a program.
         if (firstCodeIsIdDivision(code)) return new Classification(MemberType.COBOL, dialect(raw), "IDENTIFICATION DIVISION");
+        // A document quoting CICS definitions or DDL must not supply false transactions and tables.
+        if (isProse(raw)) return of(MemberType.UNKNOWN, "a document: mostly running text");
         if (BMS.matcher(raw).find()) return of(MemberType.BMS, "DFHMSD/DFHMDI");
         if (CSD.matcher(raw).find()) return of(MemberType.CSD, "CICS DEFINE statements");
         if (REXX.matcher(raw).find()) return of(MemberType.REXX, "/* REXX */ header");
@@ -51,10 +53,11 @@ public final class Classifier {
         if (DDL.matcher(raw).find()) return of(MemberType.DDL, "CREATE statement");
         if (SQL_CONTROL.matcher(raw).find() && !raw.toUpperCase(java.util.Locale.ROOT).contains("DCL ")) return of(MemberType.CONTROL, "utility control statements");
         double levels = levelShare(code);
+        if (isPliStructure(raw)) return of(MemberType.PLI, "PL/I structure include");
         // PL/I structures have levels too, so PL/I is decided by its statements: they end in semicolons.
-        if (PLI.matcher(raw).find() && semicolonShare(raw) >= 0.15 && levels < 0.5 && PLI_STATEMENT.matcher(raw).find() && !isProse(raw)) return of(MemberType.PLI, "PL/I signature");
+        if (PLI.matcher(raw).find() && semicolonShare(raw) >= 0.15 && levels < 0.5 && PLI_STATEMENT.matcher(raw).find()) return of(MemberType.PLI, "PL/I signature");
         if ((levels >= 0.25 || DECLARE_TABLE.matcher(code).find()) && !PROC_DIV.matcher(code).find()) return of(MemberType.COPYBOOK, "level numbers with no PROCEDURE DIVISION");
-        if (PLI.matcher(raw).find() && raw.contains("/*") && semicolonShare(raw) > 0 && PLI_STATEMENT.matcher(raw).find() && !isProse(raw)) return of(MemberType.PLI, "PL/I signature");
+        if (PLI.matcher(raw).find() && raw.contains("/*") && semicolonShare(raw) > 0 && PLI_STATEMENT.matcher(raw).find()) return of(MemberType.PLI, "PL/I signature");
         if (ASM.matcher(raw).find()) return of(MemberType.ASSEMBLER, "Assembler signature");
         if (EASY.matcher(raw).find()) return of(MemberType.EASYTRIEVE, "Easytrieve signature");
         if (CLIST.matcher(raw).find()) return of(MemberType.CLIST, "CLIST signature");
@@ -88,6 +91,8 @@ public final class Classifier {
             if (l.isBlank()) continue;
             total++;
             String t = l.strip();
+            // Comments in source are often prose. They say nothing about what the file is.
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*") || (l.length() > 6 && l.charAt(6) == '*')) continue;
             if (t.startsWith("# ") || t.startsWith("## ") || t.startsWith("- [") || t.startsWith("| ") || t.contains("](http")) prose++;
             else if (t.split("\\s+").length >= 8 && !t.endsWith(";") && !t.startsWith("/*")) {
                 long lower = t.chars().filter(Character::isLowerCase).count(), upper = t.chars().filter(Character::isUpperCase).count();
@@ -95,6 +100,18 @@ public final class Classifier {
             }
         }
         return total > 0 && prose >= total * 0.2;
+    }
+
+    /** An included PL/I structure has levels and no statements. Its items end in commas, where COBOL's end in periods. */
+    private static boolean isPliStructure(String raw) {
+        int items = 0, commas = 0;
+        for (String l : raw.split("\n")) {
+            String t = l.strip();
+            if (!t.matches("\\d{1,2}\\s+\\S.*")) continue;
+            items++;
+            if (t.endsWith(",") || t.endsWith(";")) commas++;
+        }
+        return items >= 3 && commas >= items * 0.7;
     }
 
     private static double semicolonShare(String raw) {
