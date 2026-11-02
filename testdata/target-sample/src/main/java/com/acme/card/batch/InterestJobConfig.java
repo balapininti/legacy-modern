@@ -5,8 +5,10 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 public class InterestJobConfig {
@@ -16,7 +18,7 @@ public class InterestJobConfig {
     }
 
     @Bean
-    public Step interestStep(JobRepository repo) {
-        return new StepBuilder("STEP15", repo).build();
+    public Step interestStep(JobRepository repo, PlatformTransactionManager tm) {
+        return new StepBuilder("STEP15", repo).tasklet((contribution, context) -> RepeatStatus.FINISHED, tm).build();
     }
 }

@@ -29,9 +29,9 @@ final class FactWriter {
     }
 
     static void clearMember(JdbcTemplate jdbc, long memberId) {
-        // Only this member's own edges. A program's edge can cite this member as provenance (a statement inside a
-        // copybook it expanded); those belong to the program and go when the program is re-parsed, through program_id.
-        jdbc.update("DELETE FROM graph_edge WHERE member_id = ? AND program_id IS NULL", memberId);
+        // Only edges this member's parse produced. An edge can cite another member as provenance (a statement in a
+        // copybook a program expanded, a step in a PROC a job expanded); it belongs to whoever expanded it.
+        jdbc.update("DELETE FROM graph_edge WHERE owner_member_id = ?", memberId);
         for (String t : List.of("missing_copybook", "dialect_feature", "copy_use", "jcl_job", "bms_map", "db2_table", "copybook")) {
             jdbc.update("DELETE FROM " + t + " WHERE member_id = ?", memberId);
         }

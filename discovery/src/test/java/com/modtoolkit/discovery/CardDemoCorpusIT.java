@@ -151,6 +151,36 @@ class CardDemoCorpusIT {
                 WHERE e.type='CALLS' AND d.name='DSNTIAC' AND m.name='CSDB2RPY'""")).isEqualTo(1);
     }
 
+    /** Parallelism must not show in the result: members finish in a different order on every run. */
+    @Test
+    void repeatedFreshRunsGiveTheSameGraph() throws Exception {
+        run();
+        ObjectMapper om = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+        String first = om.writeValueAsString(reports.summary());
+        for (int i = 0; i < 3; i++) {
+            jdbc.execute("TRUNCATE member, graph_node CASCADE");
+            discovery.run(DiscoverOptions.of(CORPUS).withThreads(8));
+            assertThat(om.writeValueAsString(reports.summary())).as("run " + i).isEqualTo(first);
+        }
+    }
+
+    /** ADR 0002: our layouts against LENGTH OF, as a real COBOL compiler computed it. */
+    @Test
+    void recordLengthsMatchWhatACobolCompilerComputes() throws Exception {
+        run();
+        Path real = REPO.resolve("testdata/captures/CBACT04C/cobol-record-lengths.txt");
+        assumeTrue(Files.exists(real), "run scripts/capture-gnucobol.sh first");
+        int checked = 0;
+        for (String l : Files.readAllLines(real)) {
+            String[] p = l.strip().split("\\s+");
+            if (p.length != 2 || p[0].equals("W-PACK")) continue;
+            // The extensions carry their own copies of some copybooks, so a record can be defined more than once.
+            assertThat(jdbc.queryForList("SELECT DISTINCT d.length FROM data_item d WHERE upper(d.name) = ? AND d.level = 1 AND d.program_id IS NULL", Integer.class, p[0])).as(p[0]).contains(Integer.parseInt(p[1]));
+            checked++;
+        }
+        assertThat(checked).isEqualTo(7);
+    }
+
     /** Independent of the parser: the count of EXEC CICS in code, read straight from the files. */
     @Test
     void cicsStatementCountMatchesARawSourceScan() throws Exception {

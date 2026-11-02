@@ -33,8 +33,8 @@ final class StructureWriter {
         }
     }
 
-    private void edge(long src, long dst, String type, long member, int line, Map<String, ?> attrs) {
-        jdbc.update("INSERT INTO graph_edge (src_id, dst_id, type, member_id, line, attrs) VALUES (?,?,?,?,?,?::jsonb)", src, dst, type, member, line, json(attrs));
+    private void edge(long owner, long src, long dst, String type, long member, int line, Map<String, ?> attrs) {
+        jdbc.update("INSERT INTO graph_edge (owner_member_id, src_id, dst_id, type, member_id, line, attrs) VALUES (?,?,?,?,?,?,?::jsonb)", owner, src, dst, type, member, line, json(attrs));
     }
 
     void writeJobs(long memberId, List<JclParser.Job> jobs, Map<String, Long> memberByName) {
@@ -60,9 +60,9 @@ final class StructureWriter {
                 long stepRow = jdbc.queryForObject("INSERT INTO jcl_step (job_id, seq, name, pgm, proc, cond, params, line, source_member_id) VALUES (?,?,?,?,?,?,?::jsonb,?,?) RETURNING id", Long.class,
                         jobId, s.seq(), s.name(), effective(s), s.proc(), s.ifCond() != null ? (s.cond() == null ? "" : s.cond() + " ") + "IF " + s.ifCond() : s.cond(), json(s.params()), s.line(), srcMember);
                 long stepNode = ids.get(stepKey(jobName, s));
-                edge(stepNode, ids.get(jobKey), "RUNS_IN", memberId, j.line(), Map.of("seq", s.seq()));
+                edge(memberId, stepNode, ids.get(jobKey), "RUNS_IN", memberId, j.line(), Map.of("seq", s.seq()));
                 String pgm = effective(s);
-                if (pgm != null) edge(ids.get(new Key("program", pgm, "")), stepNode, "RUNS_IN", srcMember, s.line(), Map.of("job", jobName));
+                if (pgm != null) edge(memberId, ids.get(new Key("program", pgm, "")), stepNode, "RUNS_IN", srcMember, s.line(), Map.of("job", jobName));
                 for (JclParser.Dd d : s.dds()) {
                     jdbc.update("INSERT INTO jcl_dd (step_id, dd_name, dsn, disp, gdg_rel, attrs, line) VALUES (?,?,?,?,?,?::jsonb,?)", stepRow, d.name(), d.dsn(), d.disp(), d.gdgRel(), json(d.attrs()), d.line());
                     if (usableDsn(d)) {
@@ -70,7 +70,7 @@ final class StructureWriter {
                         a.put("dd", d.name());
                         a.put("disp", d.disp() == null ? "" : d.disp());
                         if (d.gdgRel() != null) a.put("gdg_rel", d.gdgRel());
-                        edge(stepNode, ids.get(new Key("dataset", d.dsn(), "")), "USES_DATASET", memberByName.getOrDefault(d.member(), memberId), d.line(), a);
+                        edge(memberId, stepNode, ids.get(new Key("dataset", d.dsn(), "")), "USES_DATASET", memberByName.getOrDefault(d.member(), memberId), d.line(), a);
                     }
                 }
             }
@@ -124,13 +124,13 @@ final class StructureWriter {
                     if (pgm != null) keys.add(new Key("program", pgm.toUpperCase(), ""));
                     Map<Key, Long> ids = nodes.ensure(keys);
                     nodes.setMember(ids.get(tx), memberId);
-                    if (pgm != null) edge(ids.get(new Key("program", pgm.toUpperCase(), "")), ids.get(tx), "RUNS_IN", memberId, d.line(), Map.of("via", "CSD"));
+                    if (pgm != null) edge(memberId, ids.get(new Key("program", pgm.toUpperCase(), "")), ids.get(tx), "RUNS_IN", memberId, d.line(), Map.of("via", "CSD"));
                 }
                 case "FILE" -> {
                     String dsn = d.attrs().get("DSNAME");
                     if (dsn == null || dsn.isBlank()) break;
                     Map<Key, Long> ids = nodes.ensure(List.of(new Key("file", d.name(), ""), new Key("dataset", dsn.toUpperCase(), "")));
-                    edge(ids.get(new Key("file", d.name(), "")), ids.get(new Key("dataset", dsn.toUpperCase(), "")), "USES_DATASET", memberId, d.line(), Map.of("via", "CSD"));
+                    edge(memberId, ids.get(new Key("file", d.name(), "")), ids.get(new Key("dataset", dsn.toUpperCase(), "")), "USES_DATASET", memberId, d.line(), Map.of("via", "CSD"));
                 }
                 default -> { }
             }
