@@ -140,6 +140,17 @@ class ApiIT {
         assertThat(get("/api/auth/me", admin).get("roles").toString()).contains("admin");
     }
 
+    @Test
+    void signingOutEndsTheSessionTokenButNotAPersonalOne() throws Exception {
+        String session = OM.readTree(send("POST", "/api/auth/login", null, "{\"username\":\"admin\",\"password\":\"first-run-secret\"}").body()).get("token").asText();
+        assertThat(get("/api/auth/me", session).get("username").asText()).isEqualTo("admin");
+        assertThat(OM.readTree(send("POST", "/api/auth/logout", session, null).body()).get("ended").asBoolean()).isTrue();
+        assertThat(send("GET", "/api/auth/me", session, null).statusCode()).isEqualTo(401);
+        assertThat(OM.readTree(send("POST", "/api/auth/logout", dev, null).body()).get("ended").asBoolean()).isFalse();
+        assertThat(send("GET", "/api/auth/me", dev, null).statusCode()).as("a personal token survives signing out").isEqualTo(200);
+        assertThat(send("POST", "/api/auth/logout", null, null).statusCode()).isEqualTo(401);
+    }
+
     private String jwt(String issuerUsed, RSAKey signer, List<String> roles, long ttlMs) throws Exception {
         SignedJWT j = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("k1").build(), new JWTClaimsSet.Builder().issuer(issuerUsed).subject("u1").claim("preferred_username", "oidc.user").claim("roles", roles).expirationTime(new Date(System.currentTimeMillis() + ttlMs)).build());
         j.sign(new RSASSASigner(signer));
@@ -193,6 +204,7 @@ class ApiIT {
         JsonNode g = get("/api/graph/calls?program=CBSTM03B&depth=2", dev);
         assertThat(g.get("nodes").toString()).contains("CBSTM03A");
         assertThat(g.get("edges").get(0).get("line").asInt()).isPositive();
+        assertThat(get("/api/jobs", dev).toString()).contains("POSTTRAN");
         JsonNode j = get("/api/graph/job?job=POSTTRAN", dev);
         assertThat(j.get("nodes").toString()).contains("CBTRN02C").contains("DALYTRAN");
         JsonNode l = get("/api/graph/lineage?item=WS-M03B-AREA&program=CBSTM03A", dev);
