@@ -2,6 +2,7 @@ package com.modtoolkit.discovery;
 
 import com.modtoolkit.parsers.cobol.CopybookLibrary;
 import com.modtoolkit.parsers.cobol.ProLeapCobolParser;
+import com.modtoolkit.parsers.jcl.JclParser;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -92,7 +93,17 @@ public class DiscoverJobConfig {
                 lib.add(rs.getString(3), rs.getString(2), MemberProcessor.cobolLines(rs.getString(6), rs.getString(5)), "copybook".equals(rs.getString(4)));
             }
         });
-        MemberProcessor proc = new MemberProcessor(List.of(new ProLeapCobolParser()), ctx.options.memberTimeout(), lib, ids, new FactWriter(jdbc, nodes));
+        Map<String, JclParser.ProcBody> procs = new HashMap<>();
+        Map<String, Long> procMembers = new HashMap<>();
+        // A PROC is usually named by its member. A member holding several still resolves by each PROC statement.
+        jdbc.query("SELECT id, name, normalized_text, type FROM member WHERE type IN ('proc','jcl')", rs -> {
+            String text = rs.getString(3);
+            if (text == null) return;
+            List<String> lines = java.util.Arrays.asList(text.split("\n", -1));
+            procMembers.put(rs.getString(2), rs.getLong(1));
+            if ("proc".equals(rs.getString(4))) procs.putIfAbsent(rs.getString(2).toUpperCase(java.util.Locale.ROOT), new JclParser.ProcBody(rs.getString(2), lines));
+        });
+        MemberProcessor proc = new MemberProcessor(List.of(new ProLeapCobolParser()), ctx.options.memberTimeout(), lib, ids, new FactWriter(jdbc, nodes), new StructureWriter(jdbc, nodes), procs, procMembers);
         TransactionTemplate memberTx = new TransactionTemplate(tm);
         // Copybooks first, so a program's copy_use row can point at its copybook row.
         List<Long> pending = jdbc.queryForList("SELECT id FROM member WHERE parse_status = 'pending' ORDER BY (type = 'copybook') DESC, id", Long.class);

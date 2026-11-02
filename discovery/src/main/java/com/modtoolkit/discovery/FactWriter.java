@@ -29,7 +29,10 @@ final class FactWriter {
     }
 
     static void clearMember(JdbcTemplate jdbc, long memberId) {
-        for (String t : List.of("graph_edge", "missing_copybook", "dialect_feature", "copy_use", "jcl_job", "bms_map", "db2_table", "copybook")) {
+        // Only this member's own edges. A program's edge can cite this member as provenance (a statement inside a
+        // copybook it expanded); those belong to the program and go when the program is re-parsed, through program_id.
+        jdbc.update("DELETE FROM graph_edge WHERE member_id = ? AND program_id IS NULL", memberId);
+        for (String t : List.of("missing_copybook", "dialect_feature", "copy_use", "jcl_job", "bms_map", "db2_table", "copybook")) {
             jdbc.update("DELETE FROM " + t + " WHERE member_id = ?", memberId);
         }
         jdbc.update("DELETE FROM data_item WHERE owner_member_id = ? AND program_id IS NULL", memberId);
@@ -190,7 +193,10 @@ final class FactWriter {
             if (type == null) continue;
             Long dst = ids.get(new Key(c.resourceKind(), c.resourceName(), ""));
             if (dst == null) continue; // A program held in a variable that never gets a literal: no honest edge exists.
-            edges.add(new Edge(me, dst, type, programId, mem.id(c.loc()), c.loc().line(), Map.of("via", "CICS " + c.command())));
+            Map<String, Object> a = new HashMap<>();
+            a.put("via", "CICS " + c.command());
+            if (c.attrs().containsKey("COMMAREA")) a.put("commarea", c.attrs().get("COMMAREA").replaceAll("\\(.*", "").strip().toUpperCase(Locale.ROOT));
+            edges.add(new Edge(me, dst, type, programId, mem.id(c.loc()), c.loc().line(), a));
         }
         for (Sql s : p.sql) {
             String t = sqlEdge(s.stmtType());

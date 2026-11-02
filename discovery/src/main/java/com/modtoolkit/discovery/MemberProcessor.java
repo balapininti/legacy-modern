@@ -1,6 +1,10 @@
 package com.modtoolkit.discovery;
 
+import com.modtoolkit.parsers.bms.BmsParser;
 import com.modtoolkit.parsers.cobol.*;
+import com.modtoolkit.parsers.csd.CsdParser;
+import com.modtoolkit.parsers.ddl.DdlParser;
+import com.modtoolkit.parsers.jcl.JclParser;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,20 +26,55 @@ final class MemberProcessor {
     private final CopybookLibrary lib;
     private final Map<String, Long> memberIds;
     private final FactWriter writer;
+    private final StructureWriter structure;
+    private final Map<String, JclParser.ProcBody> procs;
+    private final Map<String, Long> procMemberIds;
 
-    MemberProcessor(List<CobolParser> chain, Duration timeout, CopybookLibrary lib, Map<String, Long> memberIds, FactWriter writer) {
+    MemberProcessor(List<CobolParser> chain, Duration timeout, CopybookLibrary lib, Map<String, Long> memberIds, FactWriter writer,
+            StructureWriter structure, Map<String, JclParser.ProcBody> procs, Map<String, Long> procMemberIds) {
         this.parser = new ResilientParser(chain, timeout);
         this.lib = lib;
         this.memberIds = memberIds;
         this.writer = writer;
+        this.structure = structure;
+        this.procs = procs;
+        this.procMemberIds = procMemberIds;
     }
 
     Result process(Row r) {
         return switch (r.type()) {
             case "cobol" -> cobol(r);
             case "copybook" -> copybook(r);
-            default -> new Result(r.id(), "pending_m3", null, null, null, () -> {});
+            case "jcl" -> jcl(r);
+            case "proc" -> new Result(r.id(), "parsed", null, null, "jcl", () -> {}); // Stored expanded, in each job that uses it.
+            case "bms" -> {
+                var maps = BmsParser.parse(lines(r));
+                yield new Result(r.id(), "parsed", null, null, "bms", () -> structure.writeBms(r.id(), maps));
+            }
+            case "ddl" -> {
+                var tables = DdlParser.parse(r.text());
+                yield new Result(r.id(), "parsed", null, null, "ddl", () -> structure.writeDdl(r.id(), tables));
+            }
+            case "csd" -> {
+                var defs = CsdParser.parse(lines(r));
+                yield new Result(r.id(), "parsed", null, null, "csd", () -> structure.writeCsd(r.id(), defs));
+            }
+            default -> new Result(r.id(), "inventoried", null, null, null, () -> {});
         };
+    }
+
+    private static List<String> lines(Row r) {
+        return Arrays.asList(r.text().split("\n", -1));
+    }
+
+    private Result jcl(Row r) {
+        List<String> l = lines(r);
+        List<JclParser.Job> jobs = JclParser.parse(r.name(), l, procs::get);
+        List<CsdParser.Definition> inlineCsd = r.text().toUpperCase(java.util.Locale.ROOT).contains("DEFINE TRANSACTION") || r.text().toUpperCase(java.util.Locale.ROOT).contains("DEFINE FILE") ? CsdParser.parse(l) : List.of();
+        return new Result(r.id(), "parsed", null, null, "jcl", () -> {
+            structure.writeJobs(r.id(), jobs, procMemberIds);
+            structure.writeCsd(r.id(), inlineCsd);
+        });
     }
 
     static List<String> cobolLines(String text, String format) {

@@ -1,5 +1,6 @@
 {
-  "dead_code_candidates" : 33,
+  "db2_tables" : 5,
+  "dead_code_candidates" : 1,
   "dialect_features" : {
     "ALTER" : 1,
     "COMP-3" : 25,
@@ -11,27 +12,33 @@
     "REDEFINES" : 65
   },
   "edges_by_type" : {
-    "CALLS" : 62,
+    "CALLS" : 64,
     "COPIES" : 357,
     "DECLARES_FILE" : 54,
     "DELETES" : 3,
     "GETS_QUEUE" : 6,
     "INSERTS" : 3,
     "LINKS" : 1,
-    "MOVES_TO" : 2834,
-    "PERFORMS" : 1201,
+    "MOVES_TO" : 2925,
+    "PERFORMS" : 1202,
     "PUTS_QUEUE" : 14,
     "READS" : 113,
     "RECEIVES_MAP" : 21,
     "REDEFINES" : 208,
-    "SELECTS" : 4,
+    "RUNS_IN" : 329,
+    "SELECTS" : 5,
     "SENDS_MAP" : 21,
     "STARTS_TRANSACTION" : 24,
     "UPDATES" : 4,
+    "USES_DATASET" : 324,
     "WRITES" : 147,
     "XCTLS" : 41
   },
+  "job_steps" : 154,
+  "jobs" : 56,
   "lines" : 59241,
+  "map_fields" : 1166,
+  "maps" : 21,
   "members_by_dialect" : {
     "ibm-enterprise" : 44,
     "n/a" : 285
@@ -49,17 +56,17 @@
     "unknown" : 108
   },
   "missing_copybooks" : 0,
+  "missing_procs" : 0,
   "parse_status" : {
     "inventoried" : 122,
-    "parsed" : 109,
-    "pending_m3" : 98
+    "parsed" : 207
   },
   "programs" : 44,
   "static_calls" : {
-    "resolved_in_estate" : 19,
+    "resolved_in_estate" : 20,
     "resolved_pct" : 100.0,
     "system_api" : 43,
-    "total" : 62
+    "total" : 63
   },
   "unresolved_dynamic_calls" : 13
 }

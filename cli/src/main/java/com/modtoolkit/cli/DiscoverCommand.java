@@ -54,6 +54,7 @@ public class DiscoverCommand implements Callable<Integer> {
                 full.put("unresolved_calls", reports.unresolvedCalls());
                 full.put("calls_to_missing_programs", reports.callsToMissingPrograms());
                 full.put("missing_copybooks", reports.missingCopybooks());
+                full.put("missing_procs", reports.missingProcs());
                 full.put("dead_code_candidates", reports.deadCodeCandidates());
                 json.writerWithDefaultPrettyPrinter().writeValue(report.toFile(), full);
             }

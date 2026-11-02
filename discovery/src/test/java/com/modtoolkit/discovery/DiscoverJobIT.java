@@ -186,6 +186,68 @@ class DiscoverJobIT {
         assertThat(count("SELECT count(*) FROM program WHERE program_id='EBCPGM'")).isEqualTo(1);
     }
 
+    /** Regression: parsing a late-discovered copybook must not delete the facts of the programs that expanded it. */
+    @Test
+    void factsFromAFragmentCopybookSurviveItsLateClassification() throws Exception {
+        // Statements only, so its content signature says nothing; only the COPY reveals what it is.
+        Files.writeString(root.resolve("FRAG"), "       9000-FRAG.\n           CALL 'FROMFRAG'.\n           EXEC SQL DELETE FROM FRAGTAB END-EXEC.\n");
+        Files.writeString(root.resolve("USEFRAG"), """
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. USEFRAG.
+       PROCEDURE DIVISION.
+           GOBACK.
+           COPY FRAG.
+""");
+        discovery.run(opts());
+        assertThat(jdbc.queryForMap("SELECT type, classify_reason FROM member WHERE name='FRAG'")).containsEntry("type", "copybook").containsEntry("classify_reason", "referenced by COPY");
+        Map<String, Object> call = jdbc.queryForMap("""
+                SELECT m.name, e.line FROM graph_edge e JOIN graph_node d ON d.id=e.dst_id JOIN member m ON m.id=e.member_id WHERE e.type='CALLS' AND d.name='FROMFRAG'""");
+        assertThat(call).containsEntry("name", "FRAG").containsEntry("line", 2);
+        assertThat(count("SELECT count(*) FROM graph_edge e JOIN graph_node d ON d.id=e.dst_id WHERE e.type='DELETES' AND d.name='FRAGTAB'")).isEqualTo(1);
+    }
+
+    @Test
+    void jobsMapsTablesAndTransactionsLinkToPrograms() throws Exception {
+        Files.writeString(root.resolve("NIGHTLY"), """
+//NIGHTLY JOB (A),'X',CLASS=A
+//RUN1 EXEC PGM=CALLER
+//IN  DD DSN=PROD.CUST.DATA,DISP=SHR
+//OUT DD DSN=PROD.CUST.OUT(+1),DISP=(NEW,CATLG)
+""");
+        Files.writeString(root.resolve("ONLINE"), """
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. ONLINE.
+       PROCEDURE DIVISION.
+           EXEC CICS SEND MAP('MAP1') MAPSET('SET1') END-EXEC.
+           EXEC CICS RETURN END-EXEC.
+""");
+        Files.writeString(root.resolve("SET1"), "SET1     DFHMSD TYPE=&SYSPARM,LANG=COBOL\nMAP1     DFHMDI SIZE=(24,80)\nFLD1     DFHMDF POS=(1,1),LENGTH=5\n         DFHMSD TYPE=FINAL\n");
+        Files.writeString(root.resolve("CSD1"), "DEFINE TRANSACTION(TX01) GROUP(G) PROGRAM(ONLINE)\n");
+        Files.writeString(root.resolve("DDL1"), "CREATE TABLE S.ACCOUNTS (ID INT NOT NULL, PRIMARY KEY (ID));\n");
+        discovery.run(opts());
+        assertThat(jdbc.queryForList("SELECT parse_status FROM member", String.class)).containsOnly("parsed");
+        assertThat(jdbc.queryForMap("SELECT s.pgm, s.seq, s.line FROM jcl_step s JOIN jcl_job j ON j.id=s.job_id WHERE j.name='NIGHTLY'")).containsEntry("pgm", "CALLER").containsEntry("line", 2);
+        assertThat(jdbc.queryForObject("SELECT gdg_rel FROM jcl_dd WHERE dd_name='OUT'", Integer.class)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM graph_edge e JOIN graph_node s ON s.id=e.src_id JOIN graph_node d ON d.id=e.dst_id WHERE s.name='CALLER' AND e.type='RUNS_IN' AND d.kind='step'")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM graph_edge e JOIN graph_node s ON s.id=e.src_id JOIN graph_node d ON d.id=e.dst_id WHERE s.name='ONLINE' AND e.type='RUNS_IN' AND d.kind='transaction' AND d.name='TX01'")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT m.name FROM graph_node n JOIN member m ON m.id=n.member_id WHERE n.kind='map' AND n.name='MAP1'", String.class)).isEqualTo("SET1");
+        assertThat(jdbc.queryForObject("SELECT m.name FROM graph_node n JOIN member m ON m.id=n.member_id WHERE n.kind='table' AND n.name='ACCOUNTS'", String.class)).isEqualTo("DDL1");
+        assertThat(count("SELECT count(*) FROM bms_field WHERE name='FLD1' AND \"row\"=1 AND length=5")).isEqualTo(1);
+        // Run by JCL or a transaction means alive; the callee of CALLER was already alive.
+        assertThat(reports.deadCodeCandidates()).extracting(m -> m.get("program_id")).doesNotContain("CALLER", "ONLINE", "CALLEE");
+    }
+
+    @Test
+    void aChangedProcRefreshesTheJobsThatExpandIt() throws Exception {
+        Files.writeString(root.resolve("MYPROC"), "//MYPROC PROC\n//S EXEC PGM=OLDPGM\n");
+        Files.writeString(root.resolve("JOB1"), "//JOB1 JOB\n//R EXEC MYPROC\n");
+        discovery.run(opts());
+        assertThat(jdbc.queryForList("SELECT pgm FROM jcl_step", String.class)).containsExactly("OLDPGM");
+        Files.writeString(root.resolve("MYPROC"), "//MYPROC PROC\n//S EXEC PGM=NEWPGM\n");
+        discovery.run(opts());
+        assertThat(jdbc.queryForList("SELECT pgm FROM jcl_step", String.class)).containsExactly("NEWPGM");
+    }
+
     @Test
     void missingCopybookIsFlaggedAndUnreferencedProgramIsADeadCodeCandidate() throws Exception {
         Files.writeString(root.resolve("ORPHAN"), caller().replace("PROGRAM-ID. CALLER", "PROGRAM-ID. ORPHAN").replace("COPY CUSTREC.", "COPY NOSUCH.\n           COPY DFHAID.").replace("MOVE CUST-ID TO WS-ARG.", "CONTINUE.").replace("CALL 'CALLEE' USING WS-ARG.", "CONTINUE."));

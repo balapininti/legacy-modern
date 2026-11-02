@@ -110,6 +110,47 @@ class CardDemoCorpusIT {
         }
     }
 
+    @Test
+    void jobsMapsTransactionsAndFieldFlowMatchHandChecks() throws Exception {
+        run();
+        JsonNode hand = new ObjectMapper().readTree(REPO.resolve("testdata/hand-checked/carddemo-edges.json").toFile());
+        assertThat(n("SELECT count(*) FROM member WHERE parse_status IN ('pending','failed')")).isZero();
+        for (JsonNode j : hand.get("jobs")) {
+            assertThat(n("""
+                    SELECT count(*) FROM jcl_step s JOIN jcl_job j ON j.id=s.job_id JOIN member m ON m.id=s.source_member_id
+                    WHERE j.name=? AND s.name=? AND s.pgm=? AND s.line=? AND m.path=?""", j.get("job").asText(), j.get("step").asText(), j.get("pgm").asText(), j.get("line").asInt(), j.get("member").asText())).as(j.toString()).isEqualTo(1);
+            if (j.has("dd")) {
+                assertThat(n("""
+                        SELECT count(*) FROM jcl_dd d JOIN jcl_step s ON s.id=d.step_id JOIN jcl_job j ON j.id=s.job_id
+                        WHERE j.name=? AND d.dd_name=? AND d.dsn=? AND d.gdg_rel=?""", j.get("job").asText(), j.get("dd").asText(), j.get("dsn").asText(), j.get("gdg_rel").asInt())).as(j.toString()).isEqualTo(1);
+            }
+        }
+        for (JsonNode m : hand.get("maps")) {
+            assertThat(n("SELECT count(*) FROM bms_map b JOIN member x ON x.id=b.member_id WHERE b.name=? AND b.mapset=? AND x.path=? AND b.line=?", m.get("map").asText(), m.get("mapset").asText(), m.get("member").asText(), m.get("line").asInt())).as(m.toString()).isEqualTo(1);
+            assertThat(n("""
+                    SELECT count(*) FROM graph_edge e JOIN graph_node s ON s.id=e.src_id JOIN graph_node d ON d.id=e.dst_id
+                    WHERE e.type='SENDS_MAP' AND s.name=? AND d.name=? AND e.line=?""", m.get("program").asText(), m.get("map").asText(), m.get("send_line").asInt())).as(m.toString()).isEqualTo(1);
+        }
+        for (JsonNode t : hand.get("transactions")) {
+            assertThat(n("""
+                    SELECT count(*) FROM graph_edge e JOIN graph_node s ON s.id=e.src_id JOIN graph_node d ON d.id=e.dst_id JOIN member m ON m.id=e.member_id
+                    WHERE e.type='RUNS_IN' AND d.kind='transaction' AND d.name=? AND s.name=? AND m.path=? AND e.line=?""", t.get("transaction").asText(), t.get("program").asText(), t.get("member").asText(), t.get("line").asInt())).as(t.toString()).isEqualTo(1);
+        }
+        for (JsonNode f : hand.get("field_flow")) {
+            assertThat(n("""
+                    SELECT count(*) FROM graph_edge e JOIN graph_node s ON s.id=e.src_id JOIN graph_node d ON d.id=e.dst_id JOIN member m ON m.id=e.member_id
+                    WHERE e.type='MOVES_TO' AND s.scope=? AND s.name=? AND d.scope=? AND d.name=? AND m.path=? AND e.line=?""",
+                    f.get("from_program").asText(), f.get("from_item").asText(), f.get("to_program").asText(), f.get("to_item").asText(), f.get("member").asText(), f.get("line").asInt())).as(f.toString()).isEqualTo(1);
+        }
+        assertThat(reports.deadCodeCandidates()).extracting(m -> m.get("program_id")).containsExactly("CBTRN01C");
+        // Every CICS program in the estate that sends a map has a map with BMS source to match, in the base application.
+        assertThat(n("SELECT count(*) FROM bms_map")).isEqualTo(21);
+        // DSNTIAC is called dynamically from the copybook CSDB2RPY; this edge was lost once to a late re-parse.
+        assertThat(n("""
+                SELECT count(*) FROM graph_edge e JOIN graph_node d ON d.id=e.dst_id JOIN member m ON m.id=e.member_id
+                WHERE e.type='CALLS' AND d.name='DSNTIAC' AND m.name='CSDB2RPY'""")).isEqualTo(1);
+    }
+
     /** Independent of the parser: the count of EXEC CICS in code, read straight from the files. */
     @Test
     void cicsStatementCountMatchesARawSourceScan() throws Exception {

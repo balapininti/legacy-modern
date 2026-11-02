@@ -30,8 +30,14 @@ public class DiscoveryReports {
         r.put("static_calls", staticCallResolution());
         r.put("unresolved_dynamic_calls", one("SELECT count(*) FROM unresolved_call"));
         r.put("missing_copybooks", one("SELECT count(DISTINCT name) FROM missing_copybook"));
+        r.put("missing_procs", one("SELECT count(DISTINCT feature) FROM dialect_feature WHERE feature LIKE 'MISSING PROC %'"));
+        r.put("jobs", one("SELECT count(*) FROM jcl_job"));
+        r.put("job_steps", one("SELECT count(*) FROM jcl_step"));
+        r.put("maps", one("SELECT count(*) FROM bms_map"));
+        r.put("map_fields", one("SELECT count(*) FROM bms_field"));
+        r.put("db2_tables", one("SELECT count(*) FROM db2_table"));
         r.put("dead_code_candidates", deadCodeCandidates().size());
-        r.put("dialect_features", counts("SELECT feature, count(DISTINCT member_id) FROM dialect_feature GROUP BY feature ORDER BY feature"));
+        r.put("dialect_features", counts("SELECT feature, count(DISTINCT member_id) FROM dialect_feature WHERE feature NOT LIKE 'MISSING PROC %' GROUP BY feature ORDER BY feature"));
         return r;
     }
 
@@ -72,6 +78,10 @@ public class DiscoveryReports {
                 ) GROUP BY d.name ORDER BY d.name""");
     }
 
+    public List<Map<String, Object>> missingProcs() {
+        return jdbc.queryForList("SELECT DISTINCT replace(d.feature, 'MISSING PROC ', '') AS proc, m.path FROM dialect_feature d JOIN member m ON m.id = d.member_id WHERE d.feature LIKE 'MISSING PROC %' ORDER BY 1, 2");
+    }
+
     public List<Map<String, Object>> missingCopybooks() {
         return jdbc.queryForList("SELECT DISTINCT c.name, m.path FROM missing_copybook c JOIN member m ON m.id = c.member_id ORDER BY 1, 2");
     }
@@ -82,8 +92,9 @@ public class DiscoveryReports {
                 SELECT p.program_id, m.path FROM program p JOIN member m ON m.id = p.member_id
                 WHERE p.parent_id IS NULL
                   AND NOT EXISTS (SELECT 1 FROM graph_edge e JOIN graph_node d ON d.id = e.dst_id
-                                  WHERE d.kind = 'program' AND d.name = upper(p.program_id) AND e.type IN ('CALLS','LINKS','XCTLS','RUNS_IN','EXECUTES'))
+                                  WHERE d.kind = 'program' AND d.name = upper(p.program_id) AND e.type IN ('CALLS','LINKS','XCTLS'))
                   AND NOT EXISTS (SELECT 1 FROM jcl_step s WHERE upper(s.pgm) = upper(p.program_id))
+                  AND NOT EXISTS (SELECT 1 FROM graph_edge e JOIN graph_node n ON n.id = e.src_id WHERE n.kind = 'program' AND n.name = upper(p.program_id) AND e.type = 'RUNS_IN')
                 ORDER BY 1""");
     }
 

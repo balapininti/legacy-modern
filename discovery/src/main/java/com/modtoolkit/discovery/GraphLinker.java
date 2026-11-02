@@ -26,6 +26,8 @@ final class GraphLinker {
     void link() throws Exception {
         jdbc.update("UPDATE copy_use u SET copybook_id = c.id FROM copybook c WHERE upper(c.name) = upper(u.copybook_name) AND u.copybook_id IS NULL");
         linkCallUsing();
+        linkFilesToDatasets();
+        linkDclgen();
         // A table holds titles and codes as well as program names; only a name in this estate is a real candidate.
         jdbc.update("""
                 UPDATE unresolved_call u SET candidates = coalesce((SELECT jsonb_agg(v) FROM jsonb_array_elements_text(u.candidates) v
@@ -38,6 +40,38 @@ final class GraphLinker {
                   'fan_in',  (SELECT count(DISTINCT e.src_id) FROM graph_edge e JOIN graph_node n ON n.id = e.dst_id
                               WHERE n.kind = 'program' AND n.name = p.program_id AND e.type IN ('CALLS','LINKS','XCTLS')))
                 """);
+    }
+
+    /**
+     * A program's SELECT ... ASSIGN TO name is the DD name in the step that runs it, which is how a file reaches its
+     * dataset. CICS file names work the same way through the CSD's FILE definition, which StructureWriter stores.
+     */
+    private void linkFilesToDatasets() {
+        jdbc.update("DELETE FROM graph_edge WHERE type = 'USES_DATASET' AND attrs->>'via' = 'DD'");
+        jdbc.update("""
+                INSERT INTO graph_edge (src_id, dst_id, type, program_id, member_id, line, attrs)
+                SELECT DISTINCT f.dst_id, u.dst_id, 'USES_DATASET', f.program_id, u.member_id, u.line, jsonb_build_object('via','DD','dd',u.attrs->>'dd','disp',u.attrs->>'disp')
+                FROM graph_edge f
+                JOIN graph_node pgm ON pgm.id = f.src_id AND pgm.kind = 'program'
+                JOIN graph_edge r ON r.src_id = pgm.id AND r.type = 'RUNS_IN'
+                JOIN graph_node st ON st.id = r.dst_id AND st.kind = 'step'
+                JOIN graph_edge u ON u.src_id = st.id AND u.type = 'USES_DATASET'
+                WHERE f.type = 'DECLARES_FILE'
+                  AND upper(u.attrs->>'dd') = upper(regexp_replace(f.attrs->>'assign', '^(?:[A-Z]{1,2}-)?(?:.*-)?', ''))
+                """);
+    }
+
+    /** A DCLGEN copybook declares the table it maps; DDL is the authority, the declaration fills gaps. */
+    private void linkDclgen() {
+        jdbc.update("""
+                UPDATE db2_table t SET dclgen_copybook_id = c.id
+                FROM sql_stmt s JOIN member m ON m.id = s.member_id JOIN copybook c ON c.member_id = m.id
+                WHERE s.stmt_type = 'DECLARE TABLE' AND s.tables ?? t.name""");
+        jdbc.update("""
+                UPDATE db2_table t SET dclgen_copybook_id = c.id
+                FROM sql_stmt s JOIN member m ON m.id = s.member_id JOIN copybook c ON c.member_id = m.id
+                CROSS JOIN LATERAL jsonb_array_elements_text(s.tables) n
+                WHERE s.stmt_type = 'DECLARE TABLE' AND upper(regexp_replace(n, '^.*\\.', '')) = upper(t.name) AND t.dclgen_copybook_id IS NULL""");
     }
 
     /** Positional: the Nth CALL argument flows into the Nth name on the callee's PROCEDURE DIVISION USING. */
@@ -70,6 +104,14 @@ final class GraphLinker {
             for (int i = 0; i < Math.min(args.size(), params.size()); i++) {
                 crossings.add(new Crossing(rs.getString(1), args.get(i), callee, params.get(i), rs.getLong(3), rs.getLong(4), rs.getInt(5), callee));
             }
+        });
+        // A CICS LINK or XCTL hands its COMMAREA to the callee's DFHCOMMAREA.
+        jdbc.query("""
+                SELECT s.name, d.name, e.program_id, e.member_id, e.line, e.attrs->>'commarea'
+                FROM graph_edge e JOIN graph_node s ON s.id = e.src_id JOIN graph_node d ON d.id = e.dst_id
+                WHERE e.type IN ('LINKS','XCTLS') AND e.attrs ?? 'commarea'
+                """, rs -> {
+            crossings.add(new Crossing(rs.getString(1), rs.getString(6), rs.getString(2), "DFHCOMMAREA", rs.getLong(3), rs.getLong(4), rs.getInt(5), rs.getString(2)));
         });
         Set<Key> keys = new HashSet<>();
         for (Crossing c : crossings) {

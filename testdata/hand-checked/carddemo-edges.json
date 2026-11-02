@@ -20,6 +20,20 @@
     {"member": "app/cbl/COMEN01C.cbl", "line": 184, "command": "XCTL", "kind": "program", "expr": "CDEMO-MENU-OPT-PGMNAME", "unresolved_has_candidate": "COACTVWC"},
     {"member": "app/cbl/COMEN01C.cbl", "line": 201, "command": "XCTL"}
   ],
+  "jobs": [
+    {"job": "POSTTRAN", "member": "app/jcl/POSTTRAN.jcl", "step": "STEP15", "pgm": "CBTRN02C", "line": 23, "dd": "DALYREJS", "dsn": "AWS.M2.CARDDEMO.DALYREJS", "gdg_rel": 1},
+    {"job": "TRANBKP", "member": "app/proc/REPROC.prc", "step": "PRC001", "pgm": "IDCAMS", "line": 21, "proc": "REPROC", "seq": 1}
+  ],
+  "maps": [
+    {"map": "COSGN0A", "mapset": "COSGN00", "member": "app/bms/COSGN00.bms", "line": 26, "program": "COSGN00C", "send_line": 151}
+  ],
+  "transactions": [
+    {"transaction": "CC00", "program": "COSGN00C", "member": "app/csd/CARDDEMO.CSD", "line": 378}
+  ],
+  "field_flow": [
+    {"from_program": "CBSTM03A", "from_item": "WS-M03B-AREA", "to_program": "CBSTM03B", "to_item": "LK-M03B-AREA", "member": "app/cbl/CBSTM03A.CBL", "line": 351}
+  ],
+  "dead_code": ["CBTRN01C"],
   "features": [
     {"member": "app/cbl/CBSTM03A.CBL", "feature": "ALTER", "note": "ALTER 8100-FILE-OPEN TO PROCEED TO ... at line 300"}
   ]

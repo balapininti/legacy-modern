@@ -80,6 +80,8 @@ public final class InventoryScanner {
         if (!changedCopybooks.isEmpty()) {
             for (String cb : changedCopybooks) {
                 jdbc.update("UPDATE member SET parse_status='pending' WHERE parse_status <> 'pending' AND id IN (SELECT member_id FROM copy_use WHERE upper(copybook_name) = ?)", cb);
+                // Likewise a job that expanded a changed PROC.
+                jdbc.update("UPDATE member SET parse_status='pending' WHERE parse_status <> 'pending' AND id IN (SELECT j.member_id FROM jcl_job j JOIN jcl_step s ON s.job_id = j.id WHERE upper(s.proc) = ?)", cb);
             }
         }
         return new Counts(total, changed, removed);

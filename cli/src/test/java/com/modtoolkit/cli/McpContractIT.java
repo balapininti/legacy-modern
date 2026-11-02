@@ -213,6 +213,43 @@ class McpContractIT {
         assertThat(first.has("offset") && first.has("length")).isTrue();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"http", "stdio"})
+    void b2_flowToolsAnswerOnRealData(String t) throws Exception {
+        McpSyncClient c = client(t);
+        JsonNode jf = ok(c, "job_flow", Map.of("job", "POSTTRAN"));
+        JsonNode step = jf.get("items").get(0);
+        assertThat(step.get("pgm").asText()).isEqualTo("CBTRN02C");
+        assertThat(step.get("member").asText()).isEqualTo("app/jcl/POSTTRAN.jcl");
+        assertThat(step.get("datasets_out").findValues("dsn").stream().map(JsonNode::asText).toList()).contains("AWS.M2.CARDDEMO.DALYREJS");
+        assertThat(step.get("datasets_in").findValues("dsn").stream().map(JsonNode::asText).toList()).contains("AWS.M2.CARDDEMO.DALYTRAN.PS");
+        assertThat(ok(c, "job_flow", Map.of("program", "CBTRN02C")).get("items").get(0).get("job").asText()).isEqualTo("POSTTRAN");
+        assertThat(error(c, "job_flow", Map.of()).get("code").asText()).isEqualTo("BAD_ARGUMENT");
+
+        JsonNode sf = ok(c, "screen_flow", Map.of("map", "COSGN0A")).get("items").get(0);
+        assertThat(sf.get("member").asText()).isEqualTo("app/bms/COSGN00.bms");
+        assertThat(sf.get("fields").findValues("name").stream().map(JsonNode::asText).toList()).contains("USERID");
+        assertThat(sf.get("owning_programs").findValues("program").stream().map(JsonNode::asText).toList()).contains("COSGN00C");
+        JsonNode tx = ok(c, "screen_flow", Map.of("transaction", "CC00"));
+        assertThat(tx.get("items").get(0).get("programs").toString()).contains("COSGN00C");
+
+        JsonNode trace = ok(c, "trace_field", Map.of("data_item", "WS-M03B-AREA", "program", "CBSTM03A", "direction", "downstream", "depth", 2));
+        assertThat(trace.get("items").findValues("to_item").stream().map(JsonNode::asText).toList()).contains("LK-M03B-AREA");
+        JsonNode cross = null;
+        for (JsonNode i : trace.get("items")) if ("LK-M03B-AREA".equals(i.path("to_item").asText())) cross = i;
+        assertThat(cross.get("op").asText()).isEqualTo("CALL USING");
+        assertThat(cross.get("to_program").asText()).isEqualTo("CBSTM03B");
+        assertThat(cross.get("line").asInt()).isPositive();
+        JsonNode up = ok(c, "trace_field", Map.of("data_item", "LK-M03B-AREA", "program", "CBSTM03B", "direction", "upstream"));
+        assertThat(up.get("items").findValues("from_item").stream().map(JsonNode::asText).toList()).contains("WS-M03B-AREA");
+        assertThat(error(c, "trace_field", Map.of("data_item", "NO-SUCH-ITEM")).get("code").asText()).isEqualTo("NOT_FOUND");
+        JsonNode sqlTouch = ok(c, "trace_field", Map.of("data_item", "DCL-TR-TYPE", "program", "COTRTUPC"));
+        assertThat(sqlTouch.get("items").findValues("tables").stream().map(JsonNode::asText).toList().toString()).contains("TRANSACTION_TYPE");
+
+        JsonNode who = ok(c, "who_calls", Map.of("program", "CBTRN02C"));
+        assertThat(who.get("items").findValues("edge_type").stream().map(JsonNode::asText).toList()).contains("JCL_STEP");
+    }
+
     /** Review Focus 5 over the wire. */
     @ParameterizedTest
     @ValueSource(strings = {"http", "stdio"})
