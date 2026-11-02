@@ -2,7 +2,8 @@
 # CI's install check: from the Compose bundle to a first MCP answer, with nothing but what ships.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"; cd "$root"
-work="$(mktemp -d "${TMPDIR:-/tmp}/toolkit-smoke.XXXXXX")"; port="${SMOKE_PORT:-18443}"
+# Under the checkout, since Docker on a Mac mounts only shared paths and the system temp folder usually is not one.
+mkdir -p target; work="$(mktemp -d "$root/target/toolkit-smoke.XXXXXX")"; port="${SMOKE_PORT:-18443}"
 cp -R deploy/compose "$work/compose"; cd "$work/compose"
 trap 'docker compose --profile cli down -v >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 mkdir -p "$work/export"; cp "$root/testdata/smoke/"* "$work/export/"

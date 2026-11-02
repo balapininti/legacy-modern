@@ -43,6 +43,9 @@ public record NormalizedMember(String encoding, Format format, List<String> line
         }
         if (q != 0) return l.indexOf(q, 72) >= 0; // Open literal, closed in what would be cut.
         if (depth > 0 && l.indexOf(')', 72) >= 0) return true;
+        // END-EXEC cut anywhere by column 72 would swallow the following statements, whatever the rest looks like.
+        int end = l.toUpperCase(java.util.Locale.ROOT).indexOf("END-EXEC");
+        if (end >= 0 && end < 72 && end + 8 > 72) return true;
         // A word crossing column 72, like END-EXEC cut to END. A sequence field is short and plain alphanumeric.
         String tail = l.substring(72).stripTrailing();
         return l.charAt(71) != ' ' && l.charAt(72) != ' ' && !tail.matches("[A-Za-z0-9 ]{1,8}");

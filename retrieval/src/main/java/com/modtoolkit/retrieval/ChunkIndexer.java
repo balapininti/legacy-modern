@@ -33,7 +33,7 @@ public class ChunkIndexer {
         jdbc.update("DELETE FROM chunk c WHERE c.member_id IS NOT NULL AND c.artifact_id IS NULL AND NOT EXISTS (SELECT 1 FROM member m WHERE m.id = c.member_id AND m.content_hash = c.metadata->>'hash')");
         List<Map<String, Object>> members = jdbc.queryForList("""
                 SELECT m.id, m.path, m.type, m.content_hash FROM member m
-                WHERE m.normalized_text IS NOT NULL AND m.classify_reason <> 'empty' AND m.type NOT IN ('unknown', 'control')
+                WHERE m.normalized_text IS NOT NULL AND m.classify_reason <> 'empty' AND m.type <> 'unknown'
                   AND NOT EXISTS (SELECT 1 FROM chunk c WHERE c.member_id = m.id AND c.artifact_id IS NULL)""");
         int chunks = 0;
         for (Map<String, Object> m : members) {

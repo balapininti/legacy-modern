@@ -117,6 +117,7 @@ class NormalizeClassifyTest {
     @Test
     void anIncludedPliStructureIsNotACobolCopybook() {
         assertThat(type("  /* CIOFUNCS.INC */\n     05  IO_AREAS,\n       10  IO_REQ       CHAR(5),\n       10  IO_STAT      CHAR(2),\n       10  IO_LAST      CHAR(2);\n")).isEqualTo(MemberType.PLI);
+        assertThat(type("  /* X */\n     05  IO_AREAS,\n       10  IO_FUNC   CHAR(8),\n         /*  IO-OPEN VALUE 'OPEN'.\n         88  IO-READ VALUE 'READ'.\n         88  IO-CLOSE VALUE 'CLOSE'*/\n")).isEqualTo(MemberType.PLI);
         assertThat(type("       05  IO-AREAS.\n         10  IO-REQ  PIC X(5).\n         10  IO-STAT PIC XX.\n         10  IO-LAST PIC XX.\n")).isEqualTo(MemberType.COPYBOOK);
     }
 

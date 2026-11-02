@@ -107,11 +107,12 @@ public final class Classifier {
         int items = 0, commas = 0;
         for (String l : raw.split("\n")) {
             String t = l.strip();
-            if (!t.matches("\\d{1,2}\\s+\\S.*")) continue;
+            // An 88 here is commented-out COBOL inside a PL/I comment block, in the real include this was written for.
+            if (!t.matches("\\d{1,2}\\s+\\S.*") || t.startsWith("88")) continue;
             items++;
             if (t.endsWith(",") || t.endsWith(";")) commas++;
         }
-        return items >= 3 && commas >= items * 0.7;
+        return items >= 2 && commas >= items * 0.7;
     }
 
     private static double semicolonShare(String raw) {

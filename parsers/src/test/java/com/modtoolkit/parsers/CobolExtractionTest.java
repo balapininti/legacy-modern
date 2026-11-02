@@ -280,6 +280,10 @@ class CobolExtractionTest {
         String overrun = "                   EXEC CICS LINK PROGRAM('GUSV') COMMAREA(WS-AB-KEY) END-EXEC";
         assertThat(overrun.length()).isGreaterThan(72);
         assertThat(com.modtoolkit.parsers.normalize.NormalizedMember.fixedLine(overrun)).endsWith("END-EXEC");
+        // The second real form: what is past column 72 looks just like a sequence field.
+        String cutInside = "                                   RIDFLD(WS-HS-KEY) RESP(WS-RESP) END-EXEC";
+        assertThat(cutInside.indexOf("END-EXEC")).isLessThan(72);
+        assertThat(com.modtoolkit.parsers.normalize.NormalizedMember.fixedLine(cutInside)).endsWith("END-EXEC");
         // Even a terminator that really is gone cannot take the next statement with it.
         ProgramFacts p = one(HEAD + """
        PROCEDURE DIVISION.

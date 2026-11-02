@@ -18,8 +18,8 @@ class Mcp:
             if not line: raise RuntimeError("server closed")
             d = json.loads(line)
             if d.get("id") == self.n: return d
-    def tool(self, name, **args):
-        r = self.rpc("tools/call", {"name": name, "arguments": args})["result"]
+    def tool(self, tool_name, **args):
+        r = self.rpc("tools/call", {"name": tool_name, "arguments": args})["result"]
         return r.get("isError", False), json.loads(r["content"][0]["text"])
     def close(self):
         self.p.terminate()

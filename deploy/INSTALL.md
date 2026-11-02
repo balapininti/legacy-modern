@@ -32,7 +32,7 @@ openssl rand -base64 24   # paste as TOOLKIT_ADMIN_PASSWORD in .env
 chmod 600 .env
 ```
 
-Edit `.env` and set `TOOLKIT_SOURCE` to the absolute path of the export. To use another HTTPS port than 8443, set `TOOLKIT_HTTPS_PORT`, and use that port in the URLs below. On an air-gapped machine also set `TOOLKIT_PULL_POLICY=never`.
+Edit `.env` and set `TOOLKIT_SOURCE` to the absolute path of the export. On a Mac, Docker can mount only shared paths, usually your home directory, so keep the bundle and the export there. To use another HTTPS port than 8443, set `TOOLKIT_HTTPS_PORT`, and use that port in the URLs below. On an air-gapped machine also set `TOOLKIT_PULL_POLICY=never`.
 
 ```sh
 cp config/toolkit.yaml.example config/toolkit.yaml
