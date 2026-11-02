@@ -59,5 +59,7 @@ public final class CobolFacts {
         public final List<Stop> stops = new ArrayList<>();
         public final List<Cancel> cancels = new ArrayList<>();
         public final java.util.Set<String> unreachable = new java.util.TreeSet<>();
+        /** For a variable with no literal of its own: literals in the table it indexes, which a lead can confirm. */
+        public final Map<String, List<String>> dynamicCandidates = new java.util.HashMap<>();
     }
 }

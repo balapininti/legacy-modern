@@ -1,0 +1,26 @@
+{
+  "_how": "Each row was read from the pinned CardDemo source with grep and sed, independently of the toolkit: path, line, and what that line says.",
+  "calls": [
+    {"member": "app/cbl/COBSWAIT.cbl", "line": 38, "source": "COBSWAIT", "target": "MVSWAIT", "mode": "static"},
+    {"member": "app/cbl/CBACT01C.cbl", "line": 231, "source": "CBACT01C", "target": "COBDATFT", "mode": "static"},
+    {"member": "app/cbl/CBSTM03A.CBL", "line": 351, "source": "CBSTM03A", "target": "CBSTM03B", "mode": "static"},
+    {"member": "app/cbl/CBSTM03A.CBL", "line": 805, "source": "CBSTM03A", "target": "CBSTM03B", "mode": "static"},
+    {"member": "app/app-vsam-mq/cbl/CODATE01.cbl", "line": 301, "source": "CODATE01", "target": "MQGET", "mode": "static"},
+    {"member": "app/app-vsam-mq/cbl/CODATE01.cbl", "line": 383, "source": "CODATE01", "target": "MQPUT", "mode": "static"},
+    {"member": "app/app-vsam-mq/cbl/COACCT01.cbl", "line": 233, "source": "COACCT01", "target": "MQOPEN", "mode": "static"}
+  ],
+  "sql": [
+    {"member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl", "type": "SELECT", "table": "CARDDEMO.TRANSACTION_TYPE", "text_line": 1476},
+    {"member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl", "type": "UPDATE", "table": "CARDDEMO.TRANSACTION_TYPE", "text_line": 1545},
+    {"member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl", "type": "INSERT", "table": "CARDDEMO.TRANSACTION_TYPE", "text_line": 1598},
+    {"member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl", "type": "DELETE", "table": "CARDDEMO.TRANSACTION_TYPE", "text_line": 1628}
+  ],
+  "cics": [
+    {"member": "app/cbl/COSGN00C.cbl", "line": 156, "command": "XCTL", "note": "EXEC CICS XCTL starts on this line"},
+    {"member": "app/cbl/COMEN01C.cbl", "line": 185, "command": "XCTL", "kind": "program", "expr": "CDEMO-MENU-OPT-PGMNAME", "unresolved_has_candidate": "COACTVWC"},
+    {"member": "app/cbl/COMEN01C.cbl", "line": 202, "command": "XCTL"}
+  ],
+  "features": [
+    {"member": "app/cbl/CBSTM03A.CBL", "feature": "ALTER", "note": "ALTER 8100-FILE-OPEN TO PROCEED TO ... at line 300"}
+  ]
+}

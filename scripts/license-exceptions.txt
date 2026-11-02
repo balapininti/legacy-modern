@@ -1,3 +1,2 @@
 # group:artifact  reason. Dependencies required by the Spring stack with no permissive replacement.
 jakarta.annotation:jakarta.annotation-api  EPL-2.0 OR GPL-2.0 with Classpath Exception; required by Spring. See ADR 0003.
-com.ibm.icu:icu4j  Unicode/ICU license, permissive (MIT-style). See ADR 0003.

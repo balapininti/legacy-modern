@@ -1,0 +1,66 @@
+{
+  "dead_code_candidates" : 33,
+  "dialect_features" : {
+    "ALTER" : 1,
+    "COMP-3" : 25,
+    "EXEC CICS" : 25,
+    "EXEC SQL" : 8,
+    "IMS" : 7,
+    "MQ" : 3,
+    "OCCURS DEPENDING ON" : 22,
+    "REDEFINES" : 65
+  },
+  "edges_by_type" : {
+    "CALLS" : 62,
+    "COPIES" : 357,
+    "DECLARES_FILE" : 54,
+    "DELETES" : 3,
+    "GETS_QUEUE" : 6,
+    "INSERTS" : 3,
+    "LINKS" : 1,
+    "MOVES_TO" : 2834,
+    "PERFORMS" : 1201,
+    "PUTS_QUEUE" : 14,
+    "READS" : 113,
+    "RECEIVES_MAP" : 21,
+    "REDEFINES" : 208,
+    "SELECTS" : 4,
+    "SENDS_MAP" : 21,
+    "STARTS_TRANSACTION" : 24,
+    "UPDATES" : 4,
+    "WRITES" : 147,
+    "XCTLS" : 41
+  },
+  "lines" : 59241,
+  "members_by_dialect" : {
+    "ibm-enterprise" : 44,
+    "n/a" : 285
+  },
+  "members_by_type" : {
+    "assembler" : 8,
+    "bms" : 21,
+    "cobol" : 44,
+    "control" : 6,
+    "copybook" : 76,
+    "csd" : 8,
+    "ddl" : 7,
+    "jcl" : 56,
+    "proc" : 6,
+    "unknown" : 97
+  },
+  "missing_copybooks" : 0,
+  "parse_status" : {
+    "failed" : 1,
+    "inventoried" : 111,
+    "parsed" : 119,
+    "pending_m3" : 98
+  },
+  "programs" : 44,
+  "static_calls" : {
+    "resolved_in_estate" : 19,
+    "resolved_pct" : 100.0,
+    "system_api" : 43,
+    "total" : 62
+  },
+  "unresolved_dynamic_calls" : 13
+}

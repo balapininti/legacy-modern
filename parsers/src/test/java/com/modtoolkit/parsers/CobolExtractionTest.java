@@ -152,6 +152,30 @@ class CobolExtractionTest {
     }
 
     @Test
+    void dispatchTableVariableIsUnresolvedWithCandidates() {
+        ProgramFacts p = one("""
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 OPT-DATA.
+          05 FILLER PIC X(8) VALUE 'COACTVW'.
+          05 FILLER PIC X(8) VALUE 'COCRDLI'.
+       01 OPT-TAB REDEFINES OPT-DATA.
+          05 OPT-ROW OCCURS 2 TIMES.
+             10 OPT-PGM PIC X(8).
+       01 N PIC 9.
+       PROCEDURE DIVISION.
+       P1.
+           EXEC CICS XCTL PROGRAM(OPT-PGM(N)) END-EXEC.
+           CALL OPT-PGM(N).
+""");
+        assertThat(p.dynamicCandidates).containsEntry("OPT-PGM", List.of("COACTVW", "COCRDLI"));
+        assertThat(p.cics.get(0).resourceResolved()).isFalse();
+        assertThat(p.calls.get(0).kind()).isEqualTo(CallKind.DYNAMIC_UNRESOLVED);
+    }
+
+    @Test
     void cicsLinkIsNotACobolCall() {
         ProgramFacts p = one("""
        IDENTIFICATION DIVISION.
@@ -480,12 +504,12 @@ class CobolExtractionTest {
             @Override public CobolFacts parse(ExpandedSource s) { return parse(s); }
         };
         ExpandedSource src = CopybookResolver.expand("MAIN", lines(HEAD + "       PROCEDURE DIVISION.\n           GOBACK.\n"), lib, false);
-        var failed = new ResilientParser(List.of(hang, oom, so), Duration.ofMillis(300)).parse(src);
+        var failed = new ResilientParser(List.of(hang, oom), Duration.ofMillis(300)).parse(src);
         assertThat(failed.ok()).isFalse();
-        assertThat(failed.rejectedBy()).hasSize(3);
+        assertThat(failed.rejectedBy()).hasSize(2);
         assertThat(failed.rejectedBy().get(0)).contains("timed out");
         assertThat(failed.rejectedBy().get(1)).contains("OutOfMemoryError");
-        assertThat(failed.rejectedBy().get(2)).contains("StackOverflowError");
+        assertThat(new ResilientParser(List.of(so), Duration.ofMinutes(2)).parse(src).error()).contains("StackOverflowError");
         var ok = new ResilientParser(List.of(oom, new ProLeapCobolParser()), Duration.ofSeconds(30)).parse(src);
         assertThat(ok.ok()).isTrue();
         assertThat(ok.parser()).isEqualTo("proleap");

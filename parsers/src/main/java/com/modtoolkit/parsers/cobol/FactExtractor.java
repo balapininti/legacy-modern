@@ -476,6 +476,7 @@ final class FactExtractor extends Cobol85BaseListener {
             Set<String> cands = s.literalsOf.getOrDefault(pc.var(), Set.of());
             if (cands.isEmpty()) {
                 p.calls.add(new Call(pc.var(), CallKind.DYNAMIC_UNRESOLVED, pc.var(), pc.using(), pc.loc(), pc.paragraph()));
+                p.dynamicCandidates.put(pc.var(), tableCandidates(p, pc.var()));
             } else {
                 for (String t : cands) recordCall(t, CallKind.DYNAMIC_RESOLVED, pc.var(), pc.using(), pc.loc(), pc.paragraph(), s);
             }
@@ -569,6 +570,7 @@ final class FactExtractor extends Cobol85BaseListener {
                 Set<String> c = s.literalsOf.getOrDefault(var, Set.of());
                 if (c.isEmpty()) {
                     names.add(var);
+                    s.p.dynamicCandidates.put(var, tableCandidates(s.p, var));
                 } else {
                     names.addAll(c);
                     resolved = true;
@@ -580,6 +582,38 @@ final class FactExtractor extends Cobol85BaseListener {
             s.p.cics.add(new Cics(cmd.command(), null, null, false, attrs, l, para));
         }
         for (String n : names) s.p.cics.add(new Cics(cmd.command(), kind, n, resolved, attrs, l, para));
+    }
+
+    /**
+     * The common dispatch table: FILLER items with VALUEs under a group, and a REDEFINES of it whose OCCURS element
+     * holds the program name. The target is whichever one the subscript picks, so all of them are candidates.
+     */
+    private static List<String> tableCandidates(ProgramFacts p, String var) {
+        DataItem item = p.dataItems.stream().filter(d -> var.equals(d.name())).findFirst().orElse(null);
+        Set<String> out = new LinkedHashSet<>();
+        while (item != null) {
+            if (item.redefines() != null) {
+                String target = item.redefines();
+                DataItem base = p.dataItems.stream().filter(d -> target.equals(d.name())).findFirst().orElse(null);
+                if (base != null) {
+                    for (DataItem d : p.dataItems) {
+                        if (isUnder(p, d, base)) d.values().stream().map(v -> v.strip().toUpperCase(Locale.ROOT)).filter(v -> v.matches("[A-Z@#$][A-Z0-9@#$]{0,7}")).forEach(out::add);
+                    }
+                }
+                break;
+            }
+            item = item.parent() < 0 ? null : p.dataItems.get(item.parent());
+        }
+        return new ArrayList<>(out);
+    }
+
+    private static boolean isUnder(ProgramFacts p, DataItem d, DataItem base) {
+        DataItem cur = d;
+        while (cur != null) {
+            if (cur.index() == base.index()) return true;
+            cur = cur.parent() < 0 ? null : p.dataItems.get(cur.parent());
+        }
+        return false;
     }
 
     /** A queue name reaches MQOPEN through MOVE ... TO MQOD-OBJECTNAME; take every literal moved there. */

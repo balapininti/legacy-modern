@@ -141,3 +141,8 @@ Each task follows: failing test, implement, pass, commit.
 
 ### Task 9.1: Jib images, Compose, Helm, CLI, air-gap bundle, INSTALL.md, SBOM, Compose smoke test
 - [ ] Acceptance: following only INSTALL.md from a clean directory reaches a first MCP query, timed. `helm template` and lint pass; Helm install runs only if a local cluster is available.
+
+## Final validation (owner's list, after M9)
+
+### Task F.1: Run the finished toolkit against the owner's 10 repos
+Pin each commit in `scripts/fetch-corpora.sh`, run discover and MCP queries, and record per-repo results in `docs/evidence/final-validation.md`, failures included. Repos: aws-samples/aws-mainframe-modernization-carddemo, RocketSoftwareCOBOLandMainframe/BankDemo, IBM/Bank-of-Z, cicsdev/cics-banking-sample-application-cbsa, cicsdev/cics-genapp, navikt/DSF, etalab/taxe-fonciere, moshix/BRICKS_TS, neopragma/cobol-unit-test, openmainframeproject/cobol-programming-course.

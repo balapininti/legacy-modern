@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+  <Appenders>
+    <!-- stderr: stdout belongs to command output and to the MCP stdio transport. -->
+    <Console name="err" target="SYSTEM_ERR"><JsonTemplateLayout eventTemplateUri="classpath:JsonLayout.json"/></Console>
+    <Console name="plain" target="SYSTEM_ERR"><PatternLayout pattern="%d{HH:mm:ss} %-5p %c{1} %m%n"/></Console>
+  </Appenders>
+  <Loggers>
+    <Root level="WARN"><AppenderRef ref="${sys:toolkit.log:-plain}"/></Root>
+    <Logger name="com.modtoolkit" level="INFO"/>
+  </Loggers>
+</Configuration>

@@ -1,0 +1,23 @@
+spring:
+  main:
+    banner-mode: "off"
+    web-application-type: none
+  datasource:
+    url: ${TOOLKIT_DB_URL:jdbc:postgresql://localhost:5432/toolkit}
+    username: ${TOOLKIT_DB_USER:toolkit}
+    password: ${TOOLKIT_DB_PASSWORD:toolkit}
+    hikari:
+      maximum-pool-size: ${TOOLKIT_DB_POOL:40}
+      # A lock problem must fail fast and land in the report, never hang a long job.
+      connection-init-sql: "SET lock_timeout = '120s'"
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: never
+  flyway:
+    enabled: true
+logging:
+  level:
+    root: WARN
+    com.modtoolkit: INFO

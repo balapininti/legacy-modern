@@ -19,7 +19,7 @@ public final class Classifier {
     private static final Pattern LEVEL = p("^[ \\d]{0,6}[ ]?\\s*(0?[1-9]|[1-4][0-9]|66|77|88)\\s+[A-Z0-9:(][-A-Z0-9:()]*(\\s+|\\.|$)");
     private static final Pattern DECLARE_TABLE = p("EXEC\\s+SQL\\s+DECLARE\\s+\\S+\\s+TABLE");
     private static final Pattern PLI = p("\\bPROC(EDURE)?\\s+OPTIONS\\s*\\(\\s*(MAIN|FETCHABLE)|^\\s*DCL\\s+\\S+.*;\\s*$|^\\s*DECLARE\\s+\\S+.*;\\s*$");
-    private static final Pattern ASM = p("^\\S*\\s+(CSECT|DSECT|USING|BALR|STM|LTORG|AMODE|RMODE)(\\s|$)|^\\s+(TITLE|PRINT|MACRO|MEND)(\\s|$)");
+    private static final Pattern ASM = p("^\\S*\\s+(CSECT|DSECT|BALR|LTORG|AMODE|RMODE)(\\s|$)|^\\s+(MACRO|MEND)(\\s|$)|^[A-Z@#$][A-Z0-9@#$]*\\s+(DBD|PCB|PSBGEN)\\s+\\S+=");
     private static final Pattern EASY = p("^\\s*(FILE\\s+\\S+\\s+(FB|VB|VSAM|SEQUENTIAL)|JOB\\s+INPUT\\b)");
     private static final Pattern REXX = p("\\A\\s*(/\\*.*REXX.*\\*/)");
     private static final Pattern CLIST = p("^\\s*(CONTROL\\s+(NO)?(MSG|LIST|PROMPT)|WRITE\\s+&|SET\\s+&)");
