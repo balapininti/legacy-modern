@@ -1,6 +1,8 @@
 package com.modtoolkit.api;
 
+import com.modtoolkit.core.Hashes;
 import com.modtoolkit.core.security.TokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,7 +51,7 @@ public class AuthController {
     }
 
     @GetMapping("/config")
-    public Map<String, Object> config() {
+    public Map<String, Object> authConfig() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("oidc_issuer", env.getProperty("toolkit.oidc.issuer", ""));
         m.put("oidc_client_id", env.getProperty("TOOLKIT_OIDC_CLIENT", ""));
@@ -64,6 +66,14 @@ public class AuthController {
             return ApiErrors.body(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "wrong username or password", "check them and try again");
         }
         return ResponseEntity.ok(Map.of("token", tokens.issue(l.username(), List.of(), "ui-session"), "username", l.username()));
+    }
+
+    /** Ends a password login's session token. A personal token pasted into the UI is not this page's to revoke. */
+    @PostMapping("/logout")
+    public Map<String, Object> logout(HttpServletRequest request) {
+        String token = request.getHeader("Authorization").replaceFirst("^Bearer ", "");
+        int ended = jdbc.update("UPDATE api_token SET revoked_at = now() WHERE token_hash = ? AND name = 'ui-session' AND revoked_at IS NULL", Hashes.sha256(token));
+        return Map.of("ended", ended == 1);
     }
 
     @GetMapping("/me")

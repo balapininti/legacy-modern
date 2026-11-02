@@ -1,0 +1,130 @@
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light;
+  @include mat.theme((
+    color: (primary: mat.$azure-palette, tertiary: mat.$blue-palette),
+    typography: (plain-family: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'),
+    density: -4,
+  ));
+
+  // An operator tool: Material's tokens, turned down to table size.
+  --mat-sys-body-large-size: 13px;
+  --mat-sys-body-large-line-height: 18px;
+  --mat-sys-body-large: 400 13px/18px system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mat-sys-body-medium-size: 13px;
+  --mat-sys-label-large-size: 12.5px;
+  --mat-sys-title-small-size: 12.5px;
+  --mat-form-field-container-height: 34px;
+  --mat-form-field-container-vertical-padding: 7px;
+  --mat-form-field-outlined-label-text-populated-size: 11.5px;
+  --mat-select-trigger-text-size: 13px;
+  --mat-select-option-label-text-size: 13px;
+  --mat-tab-container-height: 34px;
+  --mat-tab-label-text-size: 12.5px;
+  --mat-button-filled-container-height: 26px;
+  --mat-button-outlined-container-height: 26px;
+  --mat-button-tonal-container-height: 26px;
+  --mat-button-text-container-height: 26px;
+  --mat-button-filled-horizontal-padding: 10px;
+  --mat-button-outlined-horizontal-padding: 10px;
+  --mat-button-tonal-horizontal-padding: 10px;
+  --mat-button-text-horizontal-padding: 8px;
+  --mat-button-filled-container-shape: 4px;
+  --mat-button-outlined-container-shape: 4px;
+  --mat-button-tonal-container-shape: 4px;
+  --mat-button-text-container-shape: 4px;
+  --mat-sidenav-container-width: 188px;
+  --mat-sidenav-container-shape: 0;
+  --mat-sidenav-content-background-color: #fff;
+  --mat-sidenav-container-background-color: #f4f6f9;
+  --mat-list-active-indicator-shape: 4px;
+  --mat-toolbar-container-background-color: #14304f;
+  --mat-toolbar-container-text-color: #fff;
+  --mat-toolbar-title-text-size: 14px;
+  --mat-toolbar-standard-height: 44px;
+}
+
+:root {
+  --ok: #1b6e3c;
+  --bad: #b3261e;
+  --warn: #8a5a00;
+  --line: #d9dde3;
+  --zebra: #f6f7f9;
+  --muted: #5c6470;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: #fff;
+  color: #1b1f24;
+  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+h1 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+h2 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
+h2 .count { color: var(--muted); font-weight: 400; }
+a { color: #0b57d0; }
+code, .mono { font-family: var(--mono); font-size: 12px; }
+.muted { color: var(--muted); }
+.spacer { flex: 1; }
+.nowrap { white-space: nowrap; }
+.pre { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; }
+
+/* Shell */
+app-shell { display: flex; flex-direction: column; height: 100vh; }
+.topbar { font-size: 13px; gap: 16px; }
+.topbar .brand { color: #fff; font-weight: 600; font-size: 14px; text-decoration: none; white-space: nowrap; }
+.topbar .who { font-size: 12px; white-space: nowrap; }
+.topbar .who .muted { color: #c3cedb; }
+.topbar button { --mat-button-text-label-text-color: #fff; }
+.searchbox { display: flex; align-items: center; gap: 6px; width: min(520px, 45vw); background: #fff; color: #1b1f24; border-radius: 4px; padding: 0 8px; height: 30px; }
+.searchbox mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--muted); }
+.searchbox input { border: 0; outline: 0; flex: 1; font: inherit; font-size: 13px; background: transparent; }
+.body { flex: 1; min-height: 0; }
+.nav .mat-mdc-list-item { height: 36px; }
+.nav .mdc-list-item__primary-text, .nav [matListItemTitle] { font-size: 13px; }
+.content { padding: 12px 16px; box-sizing: border-box; }
+
+/* Dense tables: this is an operator tool. */
+.grid { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.grid th { position: sticky; top: 0; z-index: 1; background: #eef1f5; text-align: left; font-weight: 600; white-space: nowrap; }
+.grid th, .grid td { border-bottom: 1px solid var(--line); padding: 3px 8px; vertical-align: top; }
+.grid tbody tr:nth-child(even) { background: var(--zebra); }
+.grid tbody tr:hover { background: #e8f0fe; }
+.grid .num { text-align: right; font-variant-numeric: tabular-nums; }
+.grid.narrow { width: auto; min-width: 220px; }
+.scroll-x { overflow-x: auto; }
+.linklike { background: none; border: 0; padding: 0; color: #0b57d0; cursor: pointer; font: inherit; text-decoration: underline; text-align: left; }
+.cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 20px; align-items: start; }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0 0 8px; padding: 6px 10px; background: #f0f3f7; border-radius: 4px; }
+.stats b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.filters mat-form-field { width: 170px; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.actions { display: flex; gap: 4px; white-space: nowrap; }
+.mat-mdc-tab.mdc-tab { min-width: 0; padding: 0 10px; flex-grow: 0 !important; }
+
+/* Status text carries the meaning; colour only reinforces it. */
+.badge { display: inline-block; padding: 0 6px; border-radius: 3px; font-size: 11.5px; line-height: 18px; background: #e6e9ee; white-space: nowrap; }
+.badge.good { background: #d9f0e1; color: var(--ok); }
+.badge.bad { background: #fbe0de; color: var(--bad); }
+.badge.warn { background: #fdefcf; color: var(--warn); }
+
+/* State */
+.state-bar { margin-bottom: 4px; }
+.state-msg { color: var(--muted); padding: 10px 2px; }
+.state-error { display: flex; gap: 8px; color: var(--bad); background: #fdecea; padding: 8px 10px; border-radius: 4px; margin: 4px 0; }
+.snack-error { --mat-snack-bar-container-color: #8c1d18; }
+
+/* Login */
+.login { max-width: 380px; margin: 8vh auto; padding: 0 16px; display: flex; flex-direction: column; gap: 14px; }
+.login mat-form-field { width: 100%; }
+.login .sso { width: 100%; }
+
+/* Fields */
+dl.fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; margin: 0; font-size: 12.5px; }
+dl.fields dt { color: var(--muted); }
+dl.fields dd { margin: 0; overflow-wrap: anywhere; }
+dl.fields dd.pre { max-height: 180px; overflow: auto; }

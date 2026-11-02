@@ -101,6 +101,12 @@ public class DataController {
         return elements(e, program.toUpperCase());
     }
 
+    /** What the job-flow view can draw. */
+    @GetMapping("/jobs")
+    public List<Map<String, Object>> jobNames() {
+        return jdbc.queryForList("SELECT j.name, m.path AS member FROM jcl_job j JOIN member m ON m.id = j.member_id ORDER BY j.name, m.path");
+    }
+
     @GetMapping("/graph/job")
     public Map<String, Object> jobGraph(@RequestParam String job) {
         List<Map<String, Object>> e = new ArrayList<>();

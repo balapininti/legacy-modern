@@ -1,0 +1,37 @@
+{
+  "name": "toolkit-ui",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "regen-api": "node scripts/regen-api.mjs",
+    "licenses": "node scripts/license-check.mjs",
+    "e2e": "bash e2e/run.sh"
+  },
+  "private": true,
+  "packageManager": "npm@11.11.0",
+  "dependencies": {
+    "@angular/cdk": "^21.2.14",
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/material": "^21.2.14",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "cytoscape": "^3.34.4",
+    "material-icons": "^1.13.14",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.2.29",
+    "@angular/cli": "^21.2.29",
+    "@angular/compiler-cli": "^21.2.0",
+    "@playwright/test": "^1.64.1",
+    "ng-openapi-gen": "^1.1.0",
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2"
+  }
+}
