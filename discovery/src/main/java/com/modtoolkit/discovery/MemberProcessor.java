@@ -78,6 +78,11 @@ final class MemberProcessor {
                     lines.add(body.get(i));
                     origins.add(new Loc(r.name(), i + 1));
                 }
+                if (wrap == WRAP_PROC) {
+                    // A statement fragment needs no period of its own: the COPYing sentence ends it.
+                    lines.add("           .");
+                    origins.add(new Loc(r.name(), Math.max(1, body.size())));
+                }
                 ExpandedSource src = new ExpandedSource(r.name(), free, lines, origins, List.of(), List.of(), List.of());
                 ResilientParser.Outcome o = parser.parse(src);
                 if (o.ok()) {

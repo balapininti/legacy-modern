@@ -50,9 +50,8 @@
   },
   "missing_copybooks" : 0,
   "parse_status" : {
-    "failed" : 1,
     "inventoried" : 111,
-    "parsed" : 119,
+    "parsed" : 120,
     "pending_m3" : 98
   },
   "programs" : 44,

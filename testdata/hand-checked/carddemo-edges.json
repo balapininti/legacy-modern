@@ -16,9 +16,9 @@
     {"member": "app/app-transaction-type-db2/cbl/COTRTUPC.cbl", "type": "DELETE", "table": "CARDDEMO.TRANSACTION_TYPE", "text_line": 1628}
   ],
   "cics": [
-    {"member": "app/cbl/COSGN00C.cbl", "line": 156, "command": "XCTL", "note": "EXEC CICS XCTL starts on this line"},
-    {"member": "app/cbl/COMEN01C.cbl", "line": 185, "command": "XCTL", "kind": "program", "expr": "CDEMO-MENU-OPT-PGMNAME", "unresolved_has_candidate": "COACTVWC"},
-    {"member": "app/cbl/COMEN01C.cbl", "line": 202, "command": "XCTL"}
+    {"member": "app/cbl/COMEN01C.cbl", "line": 156, "command": "XCTL", "note": "EXEC CICS XCTL starts on this line"},
+    {"member": "app/cbl/COMEN01C.cbl", "line": 184, "command": "XCTL", "kind": "program", "expr": "CDEMO-MENU-OPT-PGMNAME", "unresolved_has_candidate": "COACTVWC"},
+    {"member": "app/cbl/COMEN01C.cbl", "line": 201, "command": "XCTL"}
   ],
   "features": [
     {"member": "app/cbl/CBSTM03A.CBL", "feature": "ALTER", "note": "ALTER 8100-FILE-OPEN TO PROCEED TO ... at line 300"}
