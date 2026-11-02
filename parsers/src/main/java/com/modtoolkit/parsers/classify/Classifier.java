@@ -21,7 +21,11 @@ public final class Classifier {
     private static final Pattern DECLARE_TABLE = p("EXEC\\s+SQL\\s+DECLARE\\s+\\S+\\s+TABLE");
     private static final Pattern PLI = p("\\bPROC(EDURE)?\\s+OPTIONS\\s*\\(\\s*(MAIN|FETCHABLE)|^\\s*DCL\\s+\\S+|^\\s*DECLARE\\s+\\S+.*[;,]\\s*$|^\\s*\\S+\\s*:\\s*PROC\\b|^\\s*%\\s*INCLUDE\\b|^\\s*/\\*");
     /** A real statement, since a comment banner and a semicolon also occur in test scripts and other languages. */
-    private static final Pattern PLI_STATEMENT = p("^\\s*(\\S+\\s*:\\s*)?(DCL|DECLARE|PROC|PROCEDURE|%\\s*INCLUDE|%\\s*DCL|IF\\s.*\\sTHEN|DO\\s*[;A-Z]|END\\b.*;|CALL\\s+\\S+.*;|GO\\s*TO\\s|PUT\\s+(SKIP|EDIT|LIST|FILE)|GET\\s+(EDIT|LIST|FILE)|[A-Z_#@$][A-Z0-9_#@$.]*(\\(.*\\))?\\s*=\\s*.*;)");
+    private static final Pattern PLI_STATEMENT = p("^\\s*(\\S+\\s*:\\s*)?(DCL|DECLARE|PROC|PROCEDURE)\\b|^\\s*%\\s*(INCLUDE|DCL|DECLARE)\\b|\\bPUT\\s+(SKIP|EDIT|LIST|FILE)\\b|\\bGET\\s+(EDIT|LIST|FILE)\\b");
+    /** Languages that share PL/I's comments and semicolons. Their files are not source for this toolkit's parsers. */
+    private static final Pattern OTHER_LANGUAGE = p("^\\s*(package\\s+[\\w.]+\\s*;|import\\s+[\\w.*]+\\s*;|public\\s+(final\\s+|abstract\\s+)?(class|interface|enum)\\b|function\\s+\\w*\\s*\\(|(const|let|var)\\s+\\w+\\s*=|<html\\b|<!doctype\\b)");
+    private static final Pattern PROC_OPTIONS = p("\\bPROC(EDURE)?\\s+OPTIONS\\s*\\(");
+    private static final Pattern REXX_STATEMENT = p("^\\s*(say\\s|parse\\s+(upper\\s+)?(arg|var|pull|value|source)\\b|address\\s+\\w+)");
     private static final Pattern FIRST_CODE_SKIP = p("^\\s*(CBL\\b|PROCESS\\b|\\$SET\\b|>>|\\*>|EJECT\\b|SKIP[123]\\b|TITLE\\b).*$");
     private static final Pattern ASM = p("^\\S*\\s+(CSECT|DSECT|BALR|LTORG|AMODE|RMODE)(\\s|$)|^\\s+(MACRO|MEND)(\\s|$)|^[A-Z@#$][A-Z0-9@#$]*\\s+(DBD|PCB|PSBGEN)\\s+\\S+=");
     private static final Pattern EASY = p("^\\s*(FILE\\s+\\S+\\s+(FB|VB|VSAM|SEQUENTIAL)|JOB\\s+INPUT\\b)");
@@ -49,6 +53,8 @@ public final class Classifier {
         if (BMS.matcher(raw).find()) return of(MemberType.BMS, "DFHMSD/DFHMDI");
         if (CSD.matcher(raw).find()) return of(MemberType.CSD, "CICS DEFINE statements");
         if (REXX.matcher(raw).find()) return of(MemberType.REXX, "/* REXX */ header");
+        if (REXX_STATEMENT.matcher(raw).find() && !PROC_OPTIONS.matcher(raw).find()) return of(MemberType.REXX, "REXX statements");
+        if (OTHER_LANGUAGE.matcher(raw).find()) return of(MemberType.UNKNOWN, "another language: Java, JavaScript or HTML");
         if (JCL_ANY.matcher(raw).find() && share(m, "//") >= 0.5) return of(MemberType.PROC, "JCL statements with no JOB card");
         if (DDL.matcher(raw).find()) return of(MemberType.DDL, "CREATE statement");
         if (SQL_CONTROL.matcher(raw).find() && !raw.toUpperCase(java.util.Locale.ROOT).contains("DCL ")) return of(MemberType.CONTROL, "utility control statements");

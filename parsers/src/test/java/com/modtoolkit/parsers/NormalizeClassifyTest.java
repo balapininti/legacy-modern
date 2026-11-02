@@ -109,6 +109,16 @@ class NormalizeClassifyTest {
     }
 
     /** From a real estate: a PL/I include with a COBOL copybook's name took that copybook's place in five programs. */
+    /** Each from a real repository, where these were counted as PL/I. */
+    @Test
+    void otherLanguagesWithCommentsAndSemicolonsAreNotPli() {
+        assertThat(type("/*\n/* Copyright IBM Corp. 2023\n/*\npackage com.example.bank;\nimport java.util.List;\npublic class A {\n  int x = 1;\n}\n")).isEqualTo(MemberType.UNKNOWN);
+        assertThat(type("/* header */\nfunction go() {\n  var x = 1;\n}\n")).isEqualTo(MemberType.UNKNOWN);
+        assertThat(type("/* header */\nmain: procedure\n  parse arg a;\n  say a;\n")).isEqualTo(MemberType.REXX);
+        assertThat(type("/* header */\nCount_x > 1 Then Do\n  Call Stop;\nEnd;\n")).isNotEqualTo(MemberType.PLI);
+        assertThat(type("/* a program */\nMAIN: PROC OPTIONS(MAIN);\n DCL X FIXED BIN(31);\n PUT SKIP LIST(X);\nEND MAIN;\n")).isEqualTo(MemberType.PLI);
+    }
+
     @Test
     void aDocumentQuotingCicsDefinitionsIsNotACsd() {
         assertThat(type("# CardDemo\n\nThis application is a sample that shows how the online system is put together.\n\n```\nDEFINE TRANSACTION(CA00) GROUP(CARDDEMO)\n```\n\n- [Guide](http://example.com)\n")).isEqualTo(MemberType.UNKNOWN);

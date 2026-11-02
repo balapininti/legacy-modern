@@ -73,7 +73,8 @@ test.describe('M8 acceptance on the seeded data', () => {
     expect(labels).not.toContain('Setup wizard');
     expect(labels).not.toContain('Captures');
 
-    await shellSearch(page, 'interest');
+    // A word many chunks share: for "interest" this rule is already first, which would prove nothing about the boost.
+    await shellSearch(page, 'transaction');
     const hit = page.locator('tr[data-unit="CBACT04C-R1"]');
     await expect(hit).toHaveAttribute('data-status', 'draft');
     const rankBefore = Number(await hit.getAttribute('data-rank'));
@@ -93,11 +94,11 @@ test.describe('M8 acceptance on the seeded data', () => {
     await expect(reviewed.getByTestId('artifact-status')).toHaveText('reviewed');
     await expect(reviewed).toContainText('by sme1');
 
-    await shellSearch(page, 'interest');
+    await shellSearch(page, 'transaction');
     const after = page.locator('tr[data-unit="CBACT04C-R1"]');
     await expect(after).toHaveAttribute('data-status', 'reviewed');
     const rankAfter = Number(await after.getAttribute('data-rank'));
-    console.log(`CBACT04C-R1 for "interest": rank ${rankBefore} before approval, ${rankAfter} after`);
+    console.log(`CBACT04C-R1 for "transaction": rank ${rankBefore} before approval, ${rankAfter} after`);
     expect(rankAfter).toBeLessThan(rankBefore);
     await shot(page, 'search-after-approval');
   });
@@ -337,7 +338,7 @@ test.describe('M8 acceptance on the seeded data', () => {
     await expect(page.getByTestId('by-type')).toContainText('cobol');
     await expect(page.getByTestId('dialect-features')).toContainText('EXEC CICS');
     await expect(page.getByTestId('dead-code')).toContainText('CBTRN01C');
-    await expect(page.getByTestId('unresolved')).toContainText('CDEMO-TO-PROGRAM');
+    await expect(page.getByTestId('unresolved')).toContainText('CDEMO-ADMIN-OPT-PGMNAME');
     await expect(page.getByTestId('no-parse-failures')).toBeVisible();
     await shot(page, 'inventory');
 

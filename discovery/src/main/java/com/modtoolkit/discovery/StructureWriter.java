@@ -53,6 +53,8 @@ final class StructureWriter {
             Map<Key, Long> ids = nodes.ensure(keys);
             nodes.setMember(ids.get(jobKey), memberId);
             for (String missing : j.missingProcs()) {
+                // A template placeholder such as {{TASK_NAME}} is not a PROC anyone can supply.
+                if (!String.valueOf(missing).contains("{"))
                 jdbc.update("INSERT INTO dialect_feature (member_id, feature, line) VALUES (?,?,?)", memberId, "MISSING PROC " + missing, j.line());
             }
             for (JclParser.Step s : j.steps()) {

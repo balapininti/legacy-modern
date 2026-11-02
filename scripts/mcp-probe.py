@@ -39,7 +39,10 @@ for n in sys.argv[1:] or ["carddemo", "bankdemo", "bank-of-z", "cbsa", "genapp",
                 # The citation must point at a real line that names the callee.
                 e2, s = m.tool("get_source", member=sample["member"], line_start=sample["line"], line_end=sample["line"]+6)
                 text = " ".join(i["text"] for i in s.get("items", [])).upper()
-                r["citation_ok"] = sample["to_program"].split(".")[-1] in text or "PROGRAM(" in text or "CALL" in text
+                # Named on the line, or the statement goes through a variable and that member sets it to the name as a literal.
+                callee = sample["to_program"].split(".")[-1]
+                whole = (root / ".cache/corpora" / n / sample["member"]).read_text(errors="replace").upper()
+                r["citation_ok"] = callee in text or f"'{callee}'" in whole or f'"{callee}"' in whole; r["citation"] = (sample["member"], sample["line"], sample["to_program"])
             e, x = m.tool("get_program", name=pgm, include=["callers", "callees", "tables", "jcl", "maps"]); r["get_program"] = not e
         tbl = sql(db, "select d.name from graph_edge e join graph_node d on d.id=e.dst_id where d.kind='table' group by 1 order by count(*) desc limit 1")
         if tbl:

@@ -39,7 +39,7 @@ cp config/toolkit.yaml.example config/toolkit.yaml
 ./gen-tls.sh "$(hostname)"
 ```
 
-In `config/toolkit.yaml`, set `client:` to a short name for this client; it appears in generated instructions. Replace `tls/tls.crt` and `tls/tls.key` with a certificate from the client's CA when you have one, and run `chmod 600 tls/tls.key`, leaving it readable by the container's user (uid 101) if you mount it with stricter ownership.
+In `config/toolkit.yaml`, set `client:` to a short name for this client; it appears in generated instructions. Replace `tls/tls.crt` and `tls/tls.key` with a certificate from the client's CA when you have one. The web container's unprivileged user has to read the key, which is why `gen-tls.sh` leaves it world-readable: keep the install directory itself closed to other users.
 
 ## 4. Start and check
 
@@ -66,10 +66,11 @@ Reading the summary:
 | `parse_status` | `parsed`; `in_context`, a copybook that only makes sense inside a program that parsed; `failed`, in the report with its position; `inventoried`, a member-level language or something that is not source |
 | `members_by_type` | By content. `unknown` is anything with no recognized signature: data files, documents, images. Check it for source you expected |
 | `static_calls.resolved_pct` | Calls whose target is in this estate, leaving out subsystem APIs such as MQ and CEE. Null means there were no such calls. Below 95% usually means the export is missing programs: see `calls_to_missing_programs` |
-| `db2_tables_with_ddl`, `db2_tables_referenced` | Tables with a CREATE TABLE in the export, and tables the programs' SQL touches. Zero of the first with some of the second means the DDL is not in the export |
+| `db2_tables_with_ddl`, `db2_tables_referenced` | Tables with a CREATE TABLE in the export, and tables the programs' SQL touches. Zero of the first with some of the second means the DDL is not in the export, or not in a form discovery reads, such as a Jinja template |
 | `missing_copybooks`, `missing_proc_names` | Distinct names. The report lists each place they are used |
 | `symbolic_maps_generated_from_bms` | Copybooks the BMS assembler generates, so they are expected to be absent |
-| `dead_code_candidates` | No caller, JCL step or transaction. Scheduler entries are invisible here, so these are candidates only |
+| `dead_code_candidates` | No caller, JCL step or CSD transaction. Scheduler entries are invisible here, and without CSD definitions in the export so are programs started only by a transaction, so these are candidates only |
+| `lines` | All text lines in members discovery read, including documents and other files. It is not a count of COBOL |
 | `dialect_features` | `FALLBACK PARSER koopa` counts members only the fallback parser could read. It passes over what it does not recognize, so facts from those members may be incomplete |
 
 ## 6. First MCP query
