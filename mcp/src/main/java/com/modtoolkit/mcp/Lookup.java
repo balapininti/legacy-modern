@@ -58,6 +58,13 @@ public class Lookup {
     }
 
     public Object knowledgePart(String part, long programId, String name) {
+        if (part.equals("modern")) {
+            List<Map<String, Object>> links = jdbc.queryForList("""
+                    SELECT u.kind, u.name, u.path, u.line_start, u.line_end, min(l.status) AS status, round(max(l.confidence)::numeric, 2)::float AS confidence
+                    FROM migration_link l JOIN graph_node n ON n.id = l.legacy_node_id JOIN modern_unit u ON u.id = l.modern_unit_id
+                    WHERE upper(n.name) = upper(?) AND l.status <> 'rejected' GROUP BY u.id, u.kind, u.name, u.path, u.line_start, u.line_end ORDER BY 6, 7 DESC""", name);
+            return links.isEmpty() ? Map.of("status", "not_available", "reason", "no modern code linked to " + name) : links;
+        }
         String kind = switch (part) {
             case "summary" -> "summary";
             case "rules" -> "rule";

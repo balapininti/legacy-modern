@@ -85,6 +85,7 @@ public class ToolkitMcpConfig {
         return () -> arr;
     }
 
+    /** ToolSet beans are collected from the context; the first group is a method reference, not a component. */
     @Bean
     public ToolSet legacyToolSet(LegacyTools t) {
         return t::tools;

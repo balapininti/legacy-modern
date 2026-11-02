@@ -22,6 +22,7 @@ public class DiscoverCommand implements Callable<Integer> {
     @Option(names = "--root", description = "Overrides source.root") Path root;
     @Option(names = "--threads", description = "Parallel members; defaults to the CPU count") Integer threads;
     @Option(names = "--member-timeout-seconds", defaultValue = "300") int timeout;
+    @Option(names = "--target", description = "Also index this modern repository (or target.local_path) and propose links") Path target;
     @Option(names = "--report", description = "Write the full reports as JSON to this file") Path report;
 
     @Override
@@ -40,11 +41,27 @@ public class DiscoverCommand implements Callable<Integer> {
                     s.include() == null ? o.include() : s.include(), s.exclude() == null ? o.exclude() : concat(s.exclude(), o.exclude()), o.threads(), o.memberTimeout());
         }
         long t0 = System.nanoTime();
-        try (ConfigurableApplicationContext ctx = ToolkitApp.batch()) {
+        try (ConfigurableApplicationContext ctx = ToolkitApp.batch(o.threads())) {
             ctx.getBean(DiscoveryService.class).run(o);
             DiscoveryReports reports = ctx.getBean(DiscoveryReports.class);
+            Path tgt = target != null ? target : cfg != null && cfg.target() != null && Boolean.TRUE.equals(cfg.target().indexExisting()) && cfg.target().localPath() != null ? Path.of(cfg.target().localPath()) : null;
+            Map<String, Object> modern = null;
+            if (tgt != null) {
+                String repo = cfg != null && cfg.target() != null && cfg.target().repo() != null ? cfg.target().repo() : tgt.toAbsolutePath().getFileName().toString();
+                var st = ctx.getBean(com.modtoolkit.discovery.modern.TargetIndexer.class).index(tgt, repo);
+                int links = ctx.getBean(com.modtoolkit.discovery.modern.LinkCandidates.class).propose(tgt, repo);
+                modern = new LinkedHashMap<>();
+                modern.put("repo", repo);
+                modern.put("java_files", st.javaFiles());
+                modern.put("changed_files", st.changedFiles());
+                modern.put("units_changed", st.units());
+                modern.put("java_errors", st.errors());
+                modern.put("angular", st.angular());
+                modern.put("link_candidate_writes", links);
+            }
             ObjectMapper json = new ObjectMapper();
             Map<String, Object> summary = new LinkedHashMap<>(reports.summary());
+            if (modern != null) summary.put("target", modern);
             summary.put("elapsed_seconds", Math.round((System.nanoTime() - t0) / 1e8) / 10.0);
             System.out.println(json.writerWithDefaultPrettyPrinter().writeValueAsString(summary));
             if (report != null) {

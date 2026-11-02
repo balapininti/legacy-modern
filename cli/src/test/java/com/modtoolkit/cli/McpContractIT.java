@@ -52,7 +52,10 @@ class McpContractIT {
 
     static Process http;
     static int port;
-    static String devToken, smeToken;
+    static String devToken, smeToken, adminToken;
+    static Process api;
+    static int apiPort;
+    static Path targetRepo;
     static McpSyncClient httpClient, stdioClient;
 
     static Map<String, String> env() {
@@ -83,8 +86,10 @@ class McpContractIT {
         assumeTrue(Files.isDirectory(CORPUS.resolve("app/cbl")), "run scripts/fetch-corpora.sh first");
         assumeTrue(Files.exists(JAR), "package the jar first");
         pg.start();
-        run("discover", "--root", CORPUS.toString(), "--threads", "8");
+        targetRepo = TargetRepoFixture.create(REPO, Files.createTempDirectory("target"));
+        run("discover", "--root", CORPUS.toString(), "--threads", "8", "--target", targetRepo.toString());
         run("index");
+        adminToken = lastLine(run("token", "--user", "lead1", "--role", "admin"));
         devToken = lastLine(run("token", "--user", "dev1"));
         smeToken = lastLine(run("token", "--user", "sme1", "--role", "sme-reviewer"));
         try (ServerSocket s = new ServerSocket(0)) {
@@ -103,6 +108,20 @@ class McpContractIT {
             }
         }
         httpClient = httpClient(devToken);
+        try (ServerSocket s = new ServerSocket(0)) {
+            apiPort = s.getLocalPort();
+        }
+        ProcessBuilder ab = new ProcessBuilder(java(), "-jar", JAR.toString(), "serve").redirectErrorStream(true).redirectOutput(new File(REPO.resolve("cli/target/api-it.log").toString()));
+        ab.environment().putAll(env());
+        ab.environment().put("TOOLKIT_API_PORT", String.valueOf(apiPort));
+        api = ab.start();
+        for (int i = 0; i < 120; i++) {
+            try {
+                if (c.send(HttpRequest.newBuilder(URI.create("http://localhost:" + apiPort + "/actuator/health")).build(), HttpResponse.BodyHandlers.ofString()).statusCode() == 200) break;
+            } catch (java.io.IOException e) {
+                Thread.sleep(500);
+            }
+        }
         ServerParameters sp = ServerParameters.builder(java()).args("-jar", JAR.toString(), "mcp", "stdio").env(env()).build();
         stdioClient = McpClient.sync(new StdioClientTransport(sp, new JacksonMcpJsonMapper(OM))).requestTimeout(Duration.ofSeconds(60)).initializationTimeout(Duration.ofSeconds(120)).build();
         stdioClient.initialize();
@@ -128,6 +147,7 @@ class McpContractIT {
         if (httpClient != null) httpClient.closeGracefully();
         if (stdioClient != null) stdioClient.closeGracefully();
         if (http != null) http.destroy();
+        if (api != null) api.destroy();
     }
 
     static McpSyncClient client(String transport) {
@@ -327,9 +347,98 @@ class McpContractIT {
         }
     }
 
+    private static HttpResponse<String> rest(String method, String path, String token) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + apiPort + path)).method(method, HttpRequest.BodyPublishers.noBody());
+        if (token != null) b.header("Authorization", "Bearer " + token);
+        return HttpClient.newHttpClient().send(b.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static JsonNode findLink(String legacy, String modernContains, String source) throws Exception {
+        for (JsonNode l : OM.readTree(rest("GET", "/api/links", adminToken).body())) {
+            if (l.get("legacy").asText().equals(legacy) && l.get("modern_name").asText().contains(modernContains) && (source == null || l.get("source").asText().equals(source))) return l;
+        }
+        throw new AssertionError("no link " + legacy + " -> " + modernContains);
+    }
+
+    /** M3b: the whole loop, over real processes, against a repository with real commits. */
     @Test
-    void g_serverLogHasNoStackTraces() throws Exception {
+    void h_targetCodeIsIndexedLinkedConfirmedAndReported() throws Exception {
+        JsonNode search = ok(httpClient, "search", Map.of("query", "AccountViewResponse", "kinds", List.of("modern")));
+        assertThat(search.get("items").findValues("member").stream().map(JsonNode::asText).toList()).anyMatch(m -> m.endsWith("AccountViewResponse.java"));
+        JsonNode ep = ok(httpClient, "search", Map.of("query", "AccountController", "kinds", List.of("modern")));
+        assertThat(ep.get("items")).isNotEmpty();
+
+        // Candidates from the three signals. COACTVWC is named in a comment; CBACT04C in a commit message.
+        JsonNode comment = findLink("COACTVWC", "AccountService", "name_match");
+        assertThat(comment.get("status").asText()).isEqualTo("candidate");
+        assertThat(comment.get("confidence").asDouble()).isEqualTo(0.7, org.assertj.core.data.Offset.offset(0.001));
+        JsonNode commit = findLink("CBACT04C", "InterestJobConfig", "commit_ref");
+        assertThat(commit.get("evidence").asText()).contains("Port CBACT04C");
+        assertThat(commit.get("status").asText()).isEqualTo("candidate");
+
+        JsonNode impl = ok(httpClient, "get_modern_impl", Map.of("program", "COACTVWC"));
+        JsonNode first = impl.get("items").get(0);
+        assertThat(first.get("authoritative").asBoolean()).isFalse();
+        assertThat(first.get("status").asText()).isEqualTo("candidate");
+        assertThat(first.get("path").asText()).endsWith("AccountService.java");
+
+        // A developer cannot confirm; nobody can without a token.
+        assertThat(rest("POST", "/api/links/" + comment.get("id").asLong() + "/confirm", devToken).statusCode()).isEqualTo(403);
+        assertThat(rest("POST", "/api/links/" + comment.get("id").asLong() + "/confirm", null).statusCode()).isEqualTo(401);
+        assertThat(rest("POST", "/api/links/999999/confirm", adminToken).statusCode()).isEqualTo(404);
+
+        // Before confirming, the gap report says missing; after, implemented, and the program's stage moves.
+        assertThat(ok(httpClient, "gap_report", Map.of("scope", "COACTVWC")).get("items").get(0).get("status").asText()).isEqualTo("missing");
+        assertThat(rest("POST", "/api/links/" + comment.get("id").asLong() + "/confirm", adminToken).statusCode()).isEqualTo(200);
+        JsonNode after = ok(httpClient, "get_modern_impl", Map.of("program", "COACTVWC")).get("items").get(0);
+        assertThat(after.get("authoritative").asBoolean()).isTrue();
+        JsonNode gap = ok(httpClient, "gap_report", Map.of("scope", "COACTVWC")).get("items").get(0);
+        assertThat(gap.get("status").asText()).isEqualTo("implemented");
+        assertThat(gap.get("modern_locations").get(0).get("path").asText()).endsWith("AccountService.java");
+        try (Connection con = DriverManager.getConnection(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword()); Statement st = con.createStatement();
+                ResultSet r = st.executeQuery("SELECT m.stage, m.target_refs::text FROM migration_status m JOIN program p ON p.id=m.program_id WHERE p.program_id='COACTVWC'")) {
+            assertThat(r.next()).isTrue();
+            assertThat(r.getString(1)).isEqualTo("translated");
+            assertThat(r.getString(2)).contains("AccountService.java");
+        }
+        // The gap report lists an uncovered rule once one exists.
+        try (Connection con = DriverManager.getConnection(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword()); Statement st = con.createStatement()) {
+            st.executeUpdate("""
+                    INSERT INTO knowledge_artifact (unit_kind, unit_id, kind, content, model, prompt_version, content_hash, member_id)
+                    SELECT 'program', p.id, 'rule', '{"rules":[{"rule_id":"R1","statement":"inactive accounts are not shown","line_start":200,"line_end":210}]}'::jsonb, 'test', 'v0', 'x', p.member_id
+                    FROM program p WHERE p.program_id='COACTVWC'""");
+        }
+        JsonNode g2 = ok(httpClient, "gap_report", Map.of("scope", "COACTVWC")).get("items").get(0);
+        assertThat(g2.get("status").asText()).isEqualTo("partial");
+        assertThat(g2.get("rules_uncovered").asInt()).isEqualTo(1);
+        assertThat(g2.get("rules").get(0).get("coverage").asText()).isEqualTo("uncovered");
+        assertThat(ok(httpClient, "gap_report", Map.of("scope", "POSTTRAN")).get("items").get(0).get("program").asText()).isEqualTo("CBTRN02C");
+
+        // A rejected link stays rejected when the repository is indexed again, and a confirmed one stays confirmed.
+        JsonNode tableLink = findLink("CBACT04C", "InterestJobConfig", null);
+        assertThat(rest("POST", "/api/links/" + tableLink.get("id").asLong() + "/reject", adminToken).statusCode()).isEqualTo(200);
+        run("discover", "--root", CORPUS.toString(), "--threads", "8", "--target", targetRepo.toString());
+        assertThat(findLink("CBACT04C", "InterestJobConfig", null).get("status").asText()).isEqualTo("rejected");
+        assertThat(findLink("COACTVWC", "AccountService", null).get("status").asText()).isEqualTo("confirmed");
+        assertThat(ok(httpClient, "get_modern_impl", Map.of("program", "CBACT04C")).toString()).doesNotContain("\"name\":\"com.acme.card.batch.InterestJobConfig\"").contains("INTCALC");
+
+        // The deviation register: a developer proposes, it has no effect until a lead approves.
+        Map<String, Object> dev = Map.of("legacy_ref", Map.of("program", "COACTVWC"), "modern_ref", Map.of("path", "AccountService.java"), "change", "status is always Y", "reason", "statuses moved to another service",
+                "comparison_rule", Map.of("kind", "ignore_field", "field", "ACCT-ACTIVE-STATUS"));
+        long id = ok(httpClient, "record_deviation", dev).get("items").get(0).get("id").asLong();
+        assertThat(ok(httpClient, "deviations", Map.of("program", "COACTVWC")).get("items")).isEmpty();
+        assertThat(rest("POST", "/api/deviations/" + id + "/approve", devToken).statusCode()).isEqualTo(403);
+        assertThat(rest("POST", "/api/deviations/" + id + "/approve", adminToken).statusCode()).isEqualTo(200);
+        JsonNode d = ok(httpClient, "deviations", Map.of("program", "COACTVWC")).get("items").get(0);
+        assertThat(d.get("approved_by").asText()).isEqualTo("lead1");
+        assertThat(d.get("comparison_rule").get("field").asText()).isEqualTo("ACCT-ACTIVE-STATUS");
+        assertThat(error(httpClient, "record_deviation", Map.of("legacy_ref", Map.of(), "modern_ref", Map.of(), "change", "x", "reason", "y", "comparison_rule", Map.of("kind", "nonsense"))).get("code").asText()).isEqualTo("BAD_ARGUMENT");
+    }
+
+    @Test
+    void z_serverLogHasNoStackTraces() throws Exception {
         String log = Files.readString(REPO.resolve("cli/target/mcp-it.log"));
         assertThat(log).doesNotContain("AccessDenied").doesNotContain("already committed");
+        assertThat(Files.readString(REPO.resolve("cli/target/api-it.log"))).doesNotContain("Exception");
     }
 }

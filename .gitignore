@@ -10,3 +10,4 @@ dist/
 .vscode/
 .DS_Store
 out/
+tools/ng-extract/node_modules/

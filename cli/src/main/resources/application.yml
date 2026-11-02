@@ -7,7 +7,9 @@ spring:
     username: ${TOOLKIT_DB_USER:toolkit}
     password: ${TOOLKIT_DB_PASSWORD:toolkit}
     hikari:
-      maximum-pool-size: ${TOOLKIT_DB_POOL:40}
+      # Sized per process: several run against one database, so none may hold connections it is not using.
+      maximum-pool-size: ${TOOLKIT_DB_POOL:12}
+      minimum-idle: 1
       # A lock problem must fail fast and land in the report, never hang a long job.
       connection-init-sql: "SET lock_timeout = '120s'"
   batch:

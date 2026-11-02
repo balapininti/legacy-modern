@@ -25,7 +25,7 @@ public class LexicalSearch {
         if (arr != null) args.add(arr);
         args.add(limit);
         String sql = """
-                SELECT c.kind, m.path, c.line_start, c.line_end, c.text, c.artifact_id, a.status, c.metadata->>'unit' AS unit,
+                SELECT c.kind, coalesce(m.path, c.metadata->>'path'), c.line_start, c.line_end, c.text, c.artifact_id, a.status, c.metadata->>'unit' AS unit,
                        ts_rank(c.tsv, cobol_tsquery(?)) * (CASE WHEN a.status = 'reviewed' THEN 2 WHEN a.status = 'rejected' THEN 0.1 ELSE 1 END) AS score
                 FROM chunk c LEFT JOIN member m ON m.id = c.member_id LEFT JOIN knowledge_artifact a ON a.id = c.artifact_id
                 WHERE (c.tsv @@ cobol_tsquery(?) OR c.text ILIKE '%' || ? || '%')""" + kindFilter + """
