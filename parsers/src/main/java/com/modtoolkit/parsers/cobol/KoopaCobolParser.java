@@ -361,4 +361,10 @@ public final class KoopaCobolParser implements com.modtoolkit.parsers.cobol.Cobo
             else collect(c, name, out);
         }
     }
+
+    /** Two parses at once made the same member pass in one run and fail in the next. Its grammar is built on shared state. */
+    @Override
+    public boolean serial() {
+        return true;
+    }
 }

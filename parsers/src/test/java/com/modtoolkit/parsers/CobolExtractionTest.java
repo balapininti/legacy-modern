@@ -274,6 +274,30 @@ class CobolExtractionTest {
         assertThat(com.modtoolkit.parsers.normalize.NormalizedMember.fixedLine("000100 MOVE A TO B.                                                     SEQ00001")).isEqualTo("       MOVE A TO B.");
     }
 
+    /** Koopa keeps shared state: run at once, the same member passed in one run and failed in the next. */
+    @Test
+    void aSerialParserIsNeverRunConcurrently() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger running = new java.util.concurrent.atomic.AtomicInteger(), worst = new java.util.concurrent.atomic.AtomicInteger();
+        com.modtoolkit.parsers.cobol.CobolParser serial = new com.modtoolkit.parsers.cobol.CobolParser() {
+            @Override public String name() { return "serial"; }
+            @Override public boolean serial() { return true; }
+            @Override public com.modtoolkit.parsers.cobol.CobolFacts parse(com.modtoolkit.parsers.cobol.ExpandedSource s) {
+                worst.accumulateAndGet(running.incrementAndGet(), Math::max);
+                try { Thread.sleep(30); } catch (InterruptedException e) { throw new IllegalStateException(e); }
+                running.decrementAndGet();
+                throw new com.modtoolkit.parsers.cobol.CobolParseException("no", null);
+            }
+        };
+        // The budget is shorter than the whole queue on purpose: time spent waiting must not count as parsing.
+        var parser = new com.modtoolkit.parsers.cobol.ResilientParser(List.of(serial), java.time.Duration.ofMillis(800));
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(16)) {
+            List<java.util.concurrent.Future<com.modtoolkit.parsers.cobol.ResilientParser.Outcome>> all = new java.util.ArrayList<>();
+            for (int i = 0; i < 48; i++) all.add(pool.submit(() -> parser.parse(new com.modtoolkit.parsers.cobol.ExpandedSource("M", false, List.of(), List.of(), List.of(), List.of(), List.of()))));
+            for (var f : all) assertThat(f.get().error()).doesNotContain("timed out");
+        }
+        assertThat(worst.get()).isEqualTo(1);
+    }
+
     /** From a real program: END-EXEC crossed column 72, and the block ate the next 24 lines. */
     @Test
     void aLostEndExecDoesNotSwallowTheStatementsAfterIt() {

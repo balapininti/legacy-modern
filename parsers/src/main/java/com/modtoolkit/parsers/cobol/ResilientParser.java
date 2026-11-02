@@ -10,6 +10,8 @@ public final class ResilientParser {
 
     private static final long STACK_BYTES = 512L * 1024 * 1024; // ANTLR recursion is deep on long IF chains.
 
+    private static final java.util.concurrent.locks.ReentrantLock SERIAL = new java.util.concurrent.locks.ReentrantLock();
+
     private final List<CobolParser> chain;
     private final Duration timeout;
 
@@ -33,8 +35,14 @@ public final class ResilientParser {
                 }
             }, "parse-" + src.member(), STACK_BYTES);
             t.setDaemon(true);
-            t.start();
+            // Taken here, not inside the thread, so that waiting for a turn does not use up this member's time budget.
+            boolean locked = false;
             try {
+                if (p.serial()) {
+                    SERIAL.lockInterruptibly();
+                    locked = true;
+                }
+                t.start();
                 // The fallback is an island parser whose backtracking can blow up on a big member: it gets a quarter of
                 // the budget, since a member it cannot do in time goes to the report either way.
                 t.join(p == chain.get(0) ? timeout.toMillis() : Math.max(1, timeout.toMillis() / 4));
@@ -47,6 +55,8 @@ public final class ResilientParser {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return new Outcome(null, p.name(), false, "interrupted", null, rejected);
+            } finally {
+                if (locked) SERIAL.unlock();
             }
             if (result.get() != null) {
                 return new Outcome(result.get(), p.name(), true, null, null, rejected);

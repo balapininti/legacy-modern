@@ -6,4 +6,9 @@ public interface CobolParser {
 
     /** @throws CobolParseException when the member is rejected, with the error position in the expanded source */
     CobolFacts parse(ExpandedSource src);
+
+    /** Whether this parser keeps shared state, so that only one parse at a time gives repeatable results. */
+    default boolean serial() {
+        return false;
+    }
 }
