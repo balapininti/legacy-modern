@@ -19,7 +19,7 @@ All milestones M0 to M9 are built. `mvn clean verify` passes 179 tests. All 12 b
 | M7 Verification | **Met through the spec's no-LPAR path.** GnuCOBOL capture, not a mainframe | [M7](evidence/M7.md) |
 | M8 Web UI | Met in a real browser. Real SSO not tested | [M8](evidence/M8.md) |
 | M9 Packaging | Met: 87 s from the runbook to a first MCP answer. Helm install not run | [M9](evidence/M9.md) |
-| Owner's 10 repositories | 2 COBOL programs of 321 fail to parse, both in BRICKS_TS | [Final validation](evidence/final-validation.md) |
+| Owner's 10 repositories | 2 COBOL programs of 328 fail to parse, both in BRICKS_TS | [Final validation](evidence/final-validation.md) |
 
 ## Never exercised
 
@@ -50,4 +50,4 @@ All milestones M0 to M9 are built. `mvn clean verify` passes 179 tests. All 12 b
 
 ## A real finding in CardDemo
 
-`CBACT04C.cbl`, line 220: the `ELSE` that posts accrued interest is unreachable, because the loop at line 188 ends first. The last account's interest is written as a transaction but never posted to the account. The toolkit's GnuCOBOL capture confirmed this behavior.
+`CBACT04C.cbl`, lines 219-220: the `ELSE` that posts accrued interest is unreachable at end of file, because the loop at line 188 ends first. The last account's interest is written as a transaction but never posted to the account. The toolkit's GnuCOBOL capture confirmed this behavior.
