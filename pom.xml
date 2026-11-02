@@ -107,6 +107,8 @@
                 <bannedDependencies>
                   <excludes>
                     <exclude>ch.qos.logback:*</exclude>
+                    <!-- It prints to stdout through spring-jcl, and stdout is the MCP stdio protocol. -->
+                    <exclude>commons-logging:commons-logging</exclude>
                   </excludes>
                 </bannedDependencies>
                 <requireJavaVersion><version>[21,22)</version></requireJavaVersion>

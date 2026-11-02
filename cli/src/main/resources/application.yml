@@ -23,6 +23,10 @@ spring:
     mcp:
       server:
         enabled: false
+        annotation-scanner:
+          enabled: false
+  freemarker:
+    check-template-location: false
 logging:
   level:
     root: WARN

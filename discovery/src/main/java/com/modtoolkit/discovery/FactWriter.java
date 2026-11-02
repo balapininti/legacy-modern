@@ -36,7 +36,11 @@ final class FactWriter {
             jdbc.update("DELETE FROM " + t + " WHERE member_id = ?", memberId);
         }
         jdbc.update("DELETE FROM data_item WHERE owner_member_id = ? AND program_id IS NULL", memberId);
-        jdbc.update("DELETE FROM program WHERE member_id = ?", memberId);
+        // Program rows themselves stay: migration status, reviews and knowledge hang off their ids. Only their facts go.
+        String mine = "SELECT id FROM program WHERE member_id = " + memberId;
+        for (String t : List.of("graph_edge", "paragraph", "data_item", "sql_stmt", "cics_cmd", "unresolved_call", "copy_use")) {
+            jdbc.update("DELETE FROM " + t + " WHERE program_id IN (" + mine + ")");
+        }
     }
 
     private static String json(Object o) {
@@ -78,9 +82,13 @@ final class FactWriter {
         ordered.sort((a, b) -> Integer.compare(depth(a, facts), depth(b, facts)));
         long topId = -1;
         for (ProgramFacts p : ordered) {
-            long id = insertProgram(memberId, p, p.parent == null ? null : progIds.get(p.parent));
+            long id = upsertProgram(memberId, p, p.parent == null ? null : progIds.get(p.parent));
             progIds.put(p.programId, id);
             if (topId < 0) topId = id;
+        }
+        // A program no longer in this member is gone, and only then does its history go with it.
+        for (Map<String, Object> old : jdbc.queryForList("SELECT id, program_id FROM program WHERE member_id = ?", memberId)) {
+            if (!progIds.containsKey(old.get("program_id"))) jdbc.update("DELETE FROM program WHERE id = ?", old.get("id"));
         }
         for (ExpandedSource.CopyUse c : src.copies()) {
             Long cbId = null;
@@ -114,13 +122,18 @@ final class FactWriter {
         return d;
     }
 
-    private long insertProgram(long memberId, ProgramFacts p, Long parent) {
+    private long upsertProgram(long memberId, ProgramFacts p, Long parent) {
         Map<String, Object> metrics = new HashMap<>();
         metrics.put("loc", p.loc);
         metrics.put("cyclomatic", p.cyclomatic);
         metrics.put("max_nesting", p.maxNesting);
         metrics.put("paragraphs", p.paragraphs.size());
         metrics.put("unreachable_paragraphs", p.unreachable);
+        List<Long> existing = jdbc.queryForList("SELECT id FROM program WHERE member_id = ? AND program_id = ?", Long.class, memberId, p.programId);
+        if (!existing.isEmpty()) {
+            jdbc.update("UPDATE program SET parent_id = ?, kind = ?, line_start = ?, line_end = ?, metrics = ?::jsonb WHERE id = ?", parent, p.kind, p.start.line(), p.lineEnd, json(metrics), existing.get(0));
+            return existing.get(0);
+        }
         return jdbc.queryForObject("INSERT INTO program (member_id, program_id, parent_id, kind, line_start, line_end, metrics) VALUES (?,?,?,?,?,?,?::jsonb) RETURNING id", Long.class,
                 memberId, p.programId, parent, p.kind, p.start.line(), p.lineEnd, json(metrics));
     }

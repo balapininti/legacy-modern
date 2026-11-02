@@ -1,11 +1,15 @@
 package com.modtoolkit.mcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.modtoolkit.core.config.ToolkitConfig;
 import com.modtoolkit.core.security.TokenService.Identity;
+import com.modtoolkit.knowledge.EmbedderFactory;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.server.McpSyncServerExchange;
 import io.modelcontextprotocol.server.transport.WebMvcStreamableServerTransportProvider;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +79,16 @@ public class ToolkitMcpConfig {
         // stdio: a developer's own process, already trusted by the operating system account running it.
         String user = System.getenv().getOrDefault("TOOLKIT_USER", System.getProperty("user.name", "local"));
         return new Identity(user + "@stdio", List.of("developer"));
+    }
+
+    /** Hybrid search when toolkit.yaml names an embedding model; plain lexical search otherwise. */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${TOOLKIT_CONFIG:}' != ''")
+    public com.modtoolkit.retrieval.Embedder toolkitEmbedder(org.springframework.core.env.Environment env) {
+        Path p = Path.of(env.getRequiredProperty("TOOLKIT_CONFIG"));
+        if (!Files.exists(p)) return null;
+        ToolkitConfig c = ToolkitConfig.load(p);
+        return c.llm() == null ? null : EmbedderFactory.create(c.llm(), System::getenv);
     }
 
     @Bean

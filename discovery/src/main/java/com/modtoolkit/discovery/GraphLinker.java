@@ -25,6 +25,8 @@ final class GraphLinker {
 
     void link() throws Exception {
         jdbc.update("UPDATE copy_use u SET copybook_id = c.id FROM copybook c WHERE upper(c.name) = upper(u.copybook_name) AND u.copybook_id IS NULL");
+        // USING on a program a JCL step runs is its PARM, not a sign of being a subroutine.
+        jdbc.update("UPDATE program p SET kind = 'batch' WHERE p.kind = 'subroutine' AND EXISTS (SELECT 1 FROM jcl_step s WHERE upper(s.pgm) = upper(p.program_id))");
         linkCallUsing();
         linkFilesToDatasets();
         linkDclgen();

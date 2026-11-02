@@ -1,0 +1,1 @@
+{"type":"object","required":["items"],"properties":{"items":{"type":"array","items":{"type":"object","required":["feature","line_start","line_end","guidance"],"properties":{"feature":{"type":"string"},"line_start":{"type":"integer","minimum":1},"line_end":{"type":"integer","minimum":1},"guidance":{"type":"string"}}}}}}

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.modtoolkit.discovery.DiscoveryReports;
 import com.modtoolkit.retrieval.GraphQueries;
-import com.modtoolkit.retrieval.LexicalSearch;
+import com.modtoolkit.retrieval.HybridSearch;
 import com.modtoolkit.retrieval.SearchHit;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,14 +26,16 @@ public class LegacyTools {
     private final JdbcTemplate jdbc;
     private final DiscoveryReports reports;
     private final GraphQueries graph;
-    private final LexicalSearch lexical;
+    private final HybridSearch hybrid;
+    private final org.springframework.beans.factory.ObjectProvider<com.modtoolkit.retrieval.Embedder> embedder;
     private final Lookup lookup;
 
-    public LegacyTools(JdbcTemplate jdbc, DiscoveryReports reports, GraphQueries graph, LexicalSearch lexical, Lookup lookup) {
+    public LegacyTools(JdbcTemplate jdbc, DiscoveryReports reports, GraphQueries graph, HybridSearch hybrid, org.springframework.beans.factory.ObjectProvider<com.modtoolkit.retrieval.Embedder> embedder, Lookup lookup) {
         this.jdbc = jdbc;
         this.reports = reports;
         this.graph = graph;
-        this.lexical = lexical;
+        this.hybrid = hybrid;
+        this.embedder = embedder;
         this.lookup = lookup;
     }
 
@@ -58,6 +60,8 @@ public class LegacyTools {
                         schema("\"program\":{\"type\":\"string\"},\"depth\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":20}", "program"), false, (a, w) -> calls(a, true)),
                 new ToolDef("calls_from", "Programs a program reaches, to a depth, each edge with type, member and line.",
                         schema("\"program\":{\"type\":\"string\"},\"depth\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":20}", "program"), false, (a, w) -> calls(a, false)),
+                new ToolDef("business_rules", "Business rules with condition, action, line range, confidence and review status. Reviewed rules first; rejected ones are not shown unless asked for.",
+                        schema("\"program\":{\"type\":\"string\"},\"paragraph\":{\"type\":\"string\"},\"data_item\":{\"type\":\"string\"},\"status\":{\"type\":\"string\",\"enum\":[\"draft\",\"reviewed\",\"rejected\"]}"), false, (a, w) -> businessRules(a)),
                 new ToolDef("table_usage", "Programs touching a DB2 table, grouped by statement type, with member and lines.",
                         schema("\"table\":{\"type\":\"string\"}", "table"), false, (a, w) -> tableUsage(a)));
     }
@@ -72,7 +76,7 @@ public class LegacyTools {
         List<String> kinds = strings(a.path("kinds"));
         int limit = Math.min(a.path("limit").asInt(20), 100);
         List<Map<String, Object>> out = new ArrayList<>();
-        for (SearchHit h : lexical.search(q, kinds, limit)) out.add(hit(h));
+        for (SearchHit h : hybrid.search(q, kinds, limit, embedder.getIfAvailable()).hits()) out.add(hit(h));
         return out;
     }
 
@@ -213,6 +217,28 @@ public class LegacyTools {
         List<Map<String, Object>> edges = callers ? new ArrayList<>(graph.callers(name, depth)) : new ArrayList<>(graph.callees(name, depth));
         if (callers) edges.addAll(lookup.jclCallers(name));
         return edges;
+    }
+
+    private List<?> businessRules(JsonNode a) {
+        String program = a.path("program").asText(null), paragraph = a.path("paragraph").asText(null), item = a.path("data_item").asText(null), status = a.path("status").asText(null);
+        if (program == null && paragraph == null && item == null) throw new ToolError("BAD_ARGUMENT", "pass program, paragraph or data_item", "for example {\"program\":\"CBACT04C\"}");
+        if (program != null) lookup.program(program);
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT p.program_id AS program, r.rule->>'rule_id' AS rule_id, r.rule->>'statement' AS statement, r.rule->>'condition' AS condition, r.rule->>'action' AS action,
+                       r.rule->>'paragraph' AS paragraph, (r.rule->>'line_start')::int AS line_start, (r.rule->>'line_end')::int AS line_end, (r.rule->>'confidence')::float AS confidence,
+                       r.rule->'data_items' AS data_items, a.id AS artifact_id, a.status, m.path AS member
+                FROM knowledge_artifact a CROSS JOIN LATERAL jsonb_array_elements(a.content->'rules') r(rule)
+                JOIN program p ON p.id = a.unit_id AND a.unit_kind = 'program' JOIN member m ON m.id = a.member_id
+                WHERE a.kind = 'rule' AND (?::text IS NULL OR upper(p.program_id) = upper(?)) AND (?::text IS NULL OR upper(r.rule->>'paragraph') = upper(?))
+                  AND (?::text IS NULL OR r.rule->'data_items' ?? upper(?)) AND (?::text IS NOT NULL OR a.status <> 'rejected') AND (?::text IS NULL OR a.status = ?)
+                ORDER BY (a.status = 'reviewed') DESC, p.program_id, (r.rule->>'line_start')::int""", program, program, paragraph, paragraph, item, item, status, status, status);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            Map<String, Object> m = new LinkedHashMap<>(r);
+            m.put("data_items", parseJson(r.get("data_items")));
+            out.add(m);
+        }
+        return out;
     }
 
     private List<?> tableUsage(JsonNode a) {

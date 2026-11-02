@@ -28,7 +28,7 @@ public class LexicalSearch {
                 SELECT c.kind, coalesce(m.path, c.metadata->>'path'), c.line_start, c.line_end, c.text, c.artifact_id, a.status, c.metadata->>'unit' AS unit,
                        ts_rank(c.tsv, cobol_tsquery(?)) * (CASE WHEN a.status = 'reviewed' THEN 2 WHEN a.status = 'rejected' THEN 0.1 ELSE 1 END) AS score
                 FROM chunk c LEFT JOIN member m ON m.id = c.member_id LEFT JOIN knowledge_artifact a ON a.id = c.artifact_id
-                WHERE (c.tsv @@ cobol_tsquery(?) OR c.text ILIKE '%' || ? || '%')""" + kindFilter + """
+                WHERE (c.tsv @@ cobol_tsquery(?) OR c.text ILIKE '%' || ? || '%') AND coalesce(a.status, '') <> 'rejected'""" + kindFilter + """
                  ORDER BY score DESC, m.path, c.line_start LIMIT ?""";
         String needle = firstToken(query);
         return jdbc.query(sql, (rs, i) -> {
@@ -53,7 +53,7 @@ public class LexicalSearch {
     static String snippet(String text, String needle) {
         String[] lines = text.split("\n", -1);
         int at = 0;
-        for (int i = 0; i < lines.length; i++) {
+        for (int i = 0; i < lines.length && !needle.isEmpty(); i++) {
             if (lines[i].toLowerCase(Locale.ROOT).contains(needle)) {
                 at = i;
                 break;

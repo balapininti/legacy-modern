@@ -1,0 +1,1 @@
+{"type":"object","required":["results"],"properties":{"results":{"type":"array","items":{"type":"object","required":["rule_id","status","reason"],"properties":{"rule_id":{"type":"string"},"status":{"type":"string","enum":["covered","uncovered","changed"]},"modern_unit_id":{"type":["integer","null"]},"reason":{"type":"string"}}}}}}

@@ -347,6 +347,14 @@ class McpContractIT {
         }
     }
 
+    /** Stdout is the stdio protocol: not a banner, not a logger, not a library's chatter. */
+    @Test
+    void i_cliStdoutHoldsOnlyCommandOutput() throws Exception {
+        assertThat(run("index")).startsWith("Stats[");
+        String token = run("token", "--user", "stdoutcheck");
+        assertThat(token).startsWith("tk_").doesNotContain("\n");
+    }
+
     private static HttpResponse<String> rest(String method, String path, String token) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + apiPort + path)).method(method, HttpRequest.BodyPublishers.noBody());
         if (token != null) b.header("Authorization", "Bearer " + token);

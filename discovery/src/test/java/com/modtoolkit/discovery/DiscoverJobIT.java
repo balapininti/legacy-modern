@@ -143,6 +143,26 @@ class DiscoverJobIT {
         assertThat(reports.callsToMissingPrograms()).extracting(m -> m.get("target")).contains("CALLEE");
     }
 
+    /** Reviews and migration progress must outlive a re-parse: a copybook change touches many programs. */
+    @Test
+    void programIdentityAndItsHistorySurviveARepeatParse() throws Exception {
+        discovery.run(opts());
+        long id = jdbc.queryForObject("SELECT id FROM program WHERE program_id='CALLER'", Long.class);
+        jdbc.update("INSERT INTO migration_status (program_id, stage) VALUES (?, 'translated')", id);
+        Files.writeString(root.resolve("CUSTREC"), CPY + "           05 CUST-OTHER PIC X.\n");
+        discovery.run(opts());
+        assertThat(jdbc.queryForObject("SELECT id FROM program WHERE program_id='CALLER'", Long.class)).isEqualTo(id);
+        assertThat(jdbc.queryForObject("SELECT stage FROM migration_status WHERE program_id = ?", String.class, id)).isEqualTo("translated");
+        assertThat(count("SELECT count(*) FROM data_item WHERE program_id = ? AND name = 'CUST-OTHER'", id)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM graph_edge e JOIN graph_node d ON d.id=e.dst_id WHERE e.type='CALLS' AND d.name='CALLEE'")).isEqualTo(1);
+        // A renamed PROGRAM-ID is a new program, and the old one leaves.
+        Files.writeString(root.resolve("CALLER"), caller().replace("PROGRAM-ID. CALLER", "PROGRAM-ID. CALLER2"));
+        discovery.run(opts());
+        assertThat(count("SELECT count(*) FROM program WHERE program_id='CALLER'")).isZero();
+        assertThat(count("SELECT count(*) FROM program WHERE program_id='CALLER2'")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM migration_status WHERE program_id = ?", id)).isZero();
+    }
+
     private Map<String, Object> stamps() {
         Map<String, Object> m = new java.util.HashMap<>();
         jdbc.query("SELECT name, updated_at FROM member", rs -> { m.put(rs.getString(1), rs.getTimestamp(2)); });

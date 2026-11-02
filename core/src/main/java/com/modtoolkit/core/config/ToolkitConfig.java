@@ -20,7 +20,7 @@ public record ToolkitConfig(
     public record Llm(
             String provider, String endpoint, String apiKeyEnv, String chatModel, String embeddingModel,
             Integer embeddingDim, Double budgetUsdPerRun, Integer concurrency, Boolean redactPii,
-            List<String> piiPatterns) {}
+            List<String> piiPatterns, Long budgetTokensPerRun, Double inputUsdPerMtok, Double outputUsdPerMtok, Integer maxContextTokens, String region) {}
 
     public record Mcp(String transport, String baseUrl, String auth) {}
 
