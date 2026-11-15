@@ -103,7 +103,8 @@ public class TargetIndexer {
         if (!hasTs) return "no TypeScript";
         Path script = locateScript();
         if (script == null) return "skipped: tools/ng-extract not found (set TOOLKIT_NG_EXTRACT)";
-        ProcessBuilder b = new ProcessBuilder("node", script.toString(), root.toString()).redirectError(ProcessBuilder.Redirect.PIPE);
+        String node = System.getenv("TOOLKIT_NODE") != null && !System.getenv("TOOLKIT_NODE").isBlank() ? System.getenv("TOOLKIT_NODE") : "node";
+        ProcessBuilder b = new ProcessBuilder(node, script.toString(), root.toString()).redirectError(ProcessBuilder.Redirect.PIPE);
         Process p;
         try {
             p = b.start();

@@ -8,37 +8,74 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/** Through the Zowe CLI and z/OSMF. The CLI is an external tool the client installs; it is not bundled (EPL-2.0). */
+/**
+ * Through the Zowe CLI and z/OSMF. The CLI is an external tool the client installs; it is not bundled (EPL-2.0).
+ *
+ * <p>Host, user and password go to the child as {@code ZOWE_OPT_*} environment variables (Zowe maps every option
+ * {@code --foo-bar} to {@code ZOWE_OPT_FOO_BAR}), so the secret is never on a command line where other local users
+ * or process listings can see it. On Windows the CLI is npm's {@code zowe.cmd} shim, which CreateProcess runs through
+ * cmd.exe; the JDK's default (legacy) quoting does not escape cmd metacharacters, so arguments to a batch file are
+ * checked and refused rather than handed to cmd.exe to interpret.
+ */
 public final class ZoweCapture implements CaptureClient {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final String zowe;
-    private final List<String> connection;
+    private final Map<String, String> connection;
 
     public ZoweCapture(String zoweCommand, String host, String user, String password) {
         this.zowe = zoweCommand;
-        this.connection = List.of("--host", host, "--user", user, "--password", password, "--reject-unauthorized", "false");
+        Map<String, String> env = new LinkedHashMap<>();
+        env.put("ZOWE_OPT_HOST", host);
+        env.put("ZOWE_OPT_USER", user);
+        env.put("ZOWE_OPT_PASSWORD", password);
+        env.put("ZOWE_OPT_REJECT_UNAUTHORIZED", "false");
+        this.connection = env;
     }
 
     private JsonNode json(String... args) throws Exception {
-        JsonNode n = JSON.readTree(run(null, withConnection(args, true)));
+        JsonNode n = JSON.readTree(run(null, command(args, true)));
         if (!n.path("success").asBoolean(true)) throw new IOException("zowe: " + n.path("message").asText());
         return n.path("data");
     }
 
-    private List<String> withConnection(String[] args, boolean rfj) {
+    private List<String> command(String[] args, boolean rfj) {
         List<String> c = new ArrayList<>(List.of(zowe));
         c.addAll(List.of(args));
-        c.addAll(connection);
         if (rfj) c.add("--rfj");
+        if (batchFile(zowe)) c.subList(1, c.size()).forEach(ZoweCapture::checkBatchArgument);
         return c;
     }
 
+    static boolean batchFile(String command) {
+        String up = command.toUpperCase(Locale.ROOT);
+        return up.endsWith(".CMD") || up.endsWith(".BAT");
+    }
+
+    /**
+     * The JDK quotes an argument only when it holds a space, so cmd.exe would read {@code & | < > ^} as operators, and it
+     * expands {@code %VAR%} even inside quotes. None of these occur in a jobid, a DSN or an ordinary file path.
+     */
+    static void checkBatchArgument(String arg) {
+        for (char ch : arg.toCharArray()) {
+            if ("\"%!^&|<>\r\n".indexOf(ch) >= 0) {
+                throw new IllegalArgumentException("argument for a .cmd Zowe CLI holds '" + ch + "', which cmd.exe would interpret: " + arg);
+            }
+        }
+    }
+
     private String run(String stdin, List<String> cmd) throws Exception {
-        Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        ProcessBuilder b = new ProcessBuilder(cmd).redirectErrorStream(true);
+        connection.forEach((k, v) -> {
+            if (v != null) b.environment().put(k, v);
+        });
+        Process p = b.start();
         if (stdin != null) p.getOutputStream().write(stdin.getBytes(StandardCharsets.UTF_8));
         p.getOutputStream().close();
         String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -51,7 +88,7 @@ public final class ZoweCapture implements CaptureClient {
 
     @Override
     public String submit(String jcl) throws Exception {
-        JsonNode n = JSON.readTree(run(jcl, withConnection(new String[] {"zos-jobs", "submit", "stdin"}, true)));
+        JsonNode n = JSON.readTree(run(jcl, command(new String[] {"zos-jobs", "submit", "stdin"}, true)));
         if (!n.path("success").asBoolean(false)) throw new IOException("submit failed: " + n.path("message").asText(n.toString()));
         return n.path("data").path("jobid").asText();
     }
@@ -75,6 +112,6 @@ public final class ZoweCapture implements CaptureClient {
 
     @Override
     public String spool(String jobId) throws Exception {
-        return run(null, withConnection(new String[] {"zos-jobs", "view", "all-spool-content", "--jobid", jobId}, false));
+        return run(null, command(new String[] {"zos-jobs", "view", "all-spool-content", "--jobid", jobId}, false));
     }
 }

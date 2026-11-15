@@ -48,7 +48,7 @@ public class CaptureCommand {
                 return 2;
             }
             String user = System.getenv(z.userEnv()), pass = System.getenv(z.passwordEnv());
-            CaptureClient c = "ftp-jes".equals(z.method()) ? new FtpJesCapture(z.host(), 21, user, pass) : new ZoweCapture(System.getenv().getOrDefault("TOOLKIT_ZOWE", "zowe"), z.host(), user, pass);
+            CaptureClient c = "ftp-jes".equals(z.method()) ? new FtpJesCapture(z.host(), 21, user, pass) : new ZoweCapture(ToolkitConfig.Zos.zoweCommand(z, System.getProperty("os.name")), z.host(), user, pass);
             CaptureRunner.Result r = new CaptureRunner(c).run(z.jobCard(), Files.readString(jcl), datasets, out, Duration.ofMinutes(minutes));
             System.out.println(r);
             return r.returnCode().contains("0000") ? 0 : 1;

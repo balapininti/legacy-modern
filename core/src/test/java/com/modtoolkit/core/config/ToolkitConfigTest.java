@@ -75,4 +75,39 @@ class ToolkitConfigTest {
         Files.writeString(p, y);
         assertThat(ConfigValidator.validate(ToolkitConfig.load(p))).isEmpty();
     }
+
+    @Test
+    void zoweCommandDefaultsByOperatingSystem() throws Exception {
+        ToolkitConfig.Zos unset = ToolkitConfig.load(sample()).zos();
+        assertThat(unset.command()).isNull();
+        assertThat(ToolkitConfig.Zos.zoweCommand(unset, "Windows 11")).isEqualTo("zowe.cmd");
+        assertThat(ToolkitConfig.Zos.zoweCommand(unset, "Windows Server 2022")).isEqualTo("zowe.cmd");
+        assertThat(ToolkitConfig.Zos.zoweCommand(unset, "Linux")).isEqualTo("zowe");
+        assertThat(ToolkitConfig.Zos.zoweCommand(unset, "Mac OS X")).isEqualTo("zowe");
+        assertThat(ToolkitConfig.Zos.zoweCommand(null, "Windows 10")).isEqualTo("zowe.cmd");
+        assertThat(ToolkitConfig.Zos.zoweCommand(null, null)).isEqualTo("zowe");
+    }
+
+    @Test
+    void zoweCommandFromConfigWinsOnEveryOperatingSystem() throws Exception {
+        ToolkitConfig.Zos z = withEdit("work_hlq: TK.CAPTURE", "work_hlq: TK.CAPTURE\n  command: 'C:\\Program Files\\zowe\\zowe.cmd'").zos();
+        assertThat(z.command()).isEqualTo("C:\\Program Files\\zowe\\zowe.cmd");
+        assertThat(ToolkitConfig.Zos.zoweCommand(z, "Windows 11")).isEqualTo("C:\\Program Files\\zowe\\zowe.cmd");
+        assertThat(ToolkitConfig.Zos.zoweCommand(z, "Linux")).isEqualTo("C:\\Program Files\\zowe\\zowe.cmd");
+        ToolkitConfig.Zos blank = withEdit("work_hlq: TK.CAPTURE", "work_hlq: TK.CAPTURE\n  command: \"  \"").zos();
+        assertThat(ToolkitConfig.Zos.zoweCommand(blank, "Linux")).isEqualTo("zowe");
+    }
+
+    @Test
+    void doctorReportsAZoweCliThatCannotStart() throws Exception {
+        Doctor.CheckResult missing = Doctor.zoweCli(dir.resolve("no-such-zowe").toString());
+        assertThat(missing.status()).isEqualTo(Doctor.Status.FAIL);
+        assertThat(missing.detail()).contains("no-such-zowe").contains("zos.command");
+        Path fake = dir.resolve("zowe");
+        Files.writeString(fake, "#!/bin/sh\necho 8.1.0\n");
+        Files.setPosixFilePermissions(fake, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+        Doctor.CheckResult found = Doctor.zoweCli(fake.toString());
+        assertThat(found.status()).isEqualTo(Doctor.Status.PASS);
+        assertThat(found.detail()).contains("8.1.0");
+    }
 }
