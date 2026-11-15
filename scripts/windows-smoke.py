@@ -293,6 +293,17 @@ class Smoke:
                                  ("init, PATH + jre", [initdb, "-D", str(tmp / "d2"), "-U", "x", "--pwfile", str(tmp / "pw"), "-A", "scram-sha-256", "--no-instructions"], jre_path)):
             rc, out = self.run(argv, env=env, timeout=300)
             lines.append(f"initdb {label}: exit {rc} {tail(out, 6)}")
+        # Where the binaries live: in the profile with a space (the install), outside it with and without a space.
+        for where in (r"C:\pgdiag", r"C:\pg diag", str(self.install.parent / "pgdiag")):
+            dst = pathlib.Path(where) / "pgsql"
+            shutil.rmtree(dst.parent, ignore_errors=True)
+            shutil.copytree(self.install / "runtime" / "pgsql", dst)
+            rc, out = self.run([str(dst / "bin" / "initdb.exe"), "-D", str(tmp / ("x" + str(abs(hash(where))))), "-U", "x", "--pwfile", str(tmp / "pw"),
+                                "-A", "scram-sha-256", "--no-instructions"], timeout=300)
+            lines.append(f"initdb from {dst}: exit {rc} {tail(out, 3)}")
+            shutil.rmtree(dst.parent, ignore_errors=True)
+        for f in (self.install, self.install / "runtime" / "pgsql" / "bin" / "initdb.exe", self.install / "runtime" / "pgsql" / "bin" / "libintl-9.dll"):
+            lines.append(self.run(["icacls", str(f)])[1].strip())
         shutil.rmtree(tmp, ignore_errors=True)
         return "\n".join(lines)
 
