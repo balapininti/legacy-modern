@@ -273,7 +273,24 @@ class Smoke:
             raise AssertionError(f"{crlf} of {len(cbl)} COBOL files have CRLF line ends; the CRLF checkout is the point")
         return f"CardDemo {pin[:12]} at {self.corpus}, CRLF in all {len(cbl)} .cbl files"
 
+    def dll_report(self):
+        """Where each DLL the PostgreSQL programs import comes from, with this machine's PATH plus runtime\\jre\\bin."""
+        dirs = self.base_env.get("PATH", "").split(os.pathsep) + [str(self.install / "runtime" / "jre" / "bin")]
+        lines = []
+        for exe in ("initdb.exe", "postgres.exe", "pg_ctl.exe", "psql.exe"):
+            r = unresolved_dlls(self.install / "runtime" / "pgsql" / "bin" / exe, dirs)
+            missing = sorted(k for k, v in r.items() if v is None)
+            outside = sorted(f"{k} <- {v}" for k, v in r.items() if v and str(self.install).lower() not in v.lower() and "\\windows\\" not in v.lower())
+            lines.append(f"{exe}: missing {missing or 'none'}; from outside the install and Windows: {outside or 'none'}")
+        sys32 = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
+        lines.append("System32 has: " + ", ".join(n for n in ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll") if (sys32 / n).is_file()))
+        return "\n".join(lines)
+
     def setup(self):
+        try:
+            print(self.dll_report(), flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"dll report failed: {e}")
         rc, out = self.tk("setup", "--source", str(self.corpus), "--client", "carddemo", timeout=600)
         for want in ("admin / ", "start.cmd", "toolkit.crt"):
             if want not in out:
@@ -609,6 +626,57 @@ class Smoke:
 
 class Abort(Exception):
     pass
+
+
+def pe_imports(data):
+    """DLL names in the import and delay-import tables of a PE image (as scripts/build-windows-bundle.py reads them)."""
+    import struct
+    pe = struct.unpack_from("<I", data, 0x3C)[0]
+    nsec = struct.unpack_from("<H", data, pe + 6)[0]
+    optsz = struct.unpack_from("<H", data, pe + 20)[0]
+    opt = pe + 24
+    dirs = opt + (112 if struct.unpack_from("<H", data, opt)[0] == 0x20B else 96)
+    secs = [struct.unpack_from("<IIII", data, opt + optsz + i * 40 + 8) for i in range(nsec)]
+
+    def off(rva):
+        for vsize, va, rawsize, raw in secs:
+            if va <= rva < va + max(vsize, rawsize):
+                return rva - va + raw
+        raise ValueError(rva)
+    names = []
+    for index, size, name_at in ((1, 20, 12), (13, 32, 4)):
+        rva = struct.unpack_from("<I", data, dirs + index * 8)[0]
+        if not rva:
+            continue
+        o = off(rva)
+        while struct.unpack_from("<I", data, o + name_at)[0]:
+            n = off(struct.unpack_from("<I", data, o + name_at)[0])
+            names.append(data[n:data.index(b"\0", n)].decode("ascii"))
+            o += size
+    return names
+
+
+def unresolved_dlls(exe, path_dirs):
+    """Walks exe's DLL imports as the Windows loader searches for them (its folder, System32, Windows, PATH):
+    returns {dll: where it was found or None}. API sets (api-ms-*, ext-ms-*) are resolved by Windows itself."""
+    sysroot = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    search = [pathlib.Path(exe).parent, sysroot / "System32", sysroot] + [pathlib.Path(d) for d in path_dirs if d]
+    found, todo = {}, [pathlib.Path(exe)]
+    while todo:
+        img = todo.pop()
+        try:
+            names = pe_imports(img.read_bytes())
+        except Exception:  # noqa: BLE001
+            continue
+        for n in names:
+            k = n.lower()
+            if k in found or k.startswith(("api-ms-", "ext-ms-")):
+                continue
+            hit = next((d / n for d in search if (d / n).is_file()), None)
+            found[k] = str(hit) if hit else None
+            if hit and sysroot not in hit.parents:
+                todo.append(hit)
+    return found
 
 
 def tail(text, n=40):
