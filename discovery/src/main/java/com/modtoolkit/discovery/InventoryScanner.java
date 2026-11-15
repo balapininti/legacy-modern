@@ -7,7 +7,8 @@ import com.modtoolkit.parsers.normalize.NormalizedMember;
 import com.modtoolkit.parsers.normalize.Normalizer;
 import com.modtoolkit.parsers.normalize.SourceOptions;
 import java.io.IOException;
-import java.nio.file.FileSystems;
+import com.modtoolkit.core.PathKeys;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
@@ -17,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -33,7 +35,7 @@ public final class InventoryScanner {
     public Counts scan(DiscoverOptions o) throws IOException {
         Map<String, String> known = new HashMap<>();
         jdbc.query("SELECT path, content_hash FROM member", rs -> { known.put(rs.getString(1), rs.getString(2)); });
-        List<PathMatcher> inc = matchers(o.include()), exc = matchers(o.exclude());
+        Predicate<Path> selected = selector(o.root(), o.include(), o.exclude());
         SourceOptions so = new SourceOptions(o.encoding(), o.format());
         Set<String> seen = new HashSet<>();
         List<String> changedCopybooks = new ArrayList<>();
@@ -43,9 +45,8 @@ public final class InventoryScanner {
             files = s.filter(Files::isRegularFile).sorted().toList();
         }
         for (Path f : files) {
-            Path rel = o.root().relativize(f);
-            if (exc.stream().anyMatch(m -> m.matches(rel)) || (!inc.isEmpty() && inc.stream().noneMatch(m -> m.matches(rel) || rootLevel(m, rel)))) continue;
-            String path = rel.toString();
+            if (!selected.test(f)) continue;
+            String path = PathKeys.key(o.root(), f);
             seen.add(path);
             total++;
             byte[] bytes = Files.readAllBytes(f);
@@ -87,13 +88,27 @@ public final class InventoryScanner {
         return new Counts(total, changed, removed);
     }
 
-    private static boolean rootLevel(PathMatcher m, Path rel) {
-        return rel.getNameCount() == 1 && m.matches(Path.of("x").resolve(rel));
+    /**
+     * Whether the include and exclude globs select a file under {@code root}. Globs are matched against the
+     * path relative to the root, using matchers from the root's own file system so that '/' in a glob
+     * matches that file system's separator (a backslash on Windows).
+     */
+    static Predicate<Path> selector(Path root, List<String> include, List<String> exclude) {
+        FileSystem fs = root.getFileSystem();
+        List<PathMatcher> inc = matchers(fs, include), exc = matchers(fs, exclude);
+        return f -> {
+            Path rel = fs.getPath(PathKeys.key(root, f));
+            return !(exc.stream().anyMatch(m -> m.matches(rel)) || (!inc.isEmpty() && inc.stream().noneMatch(m -> m.matches(rel) || rootLevel(m, rel))));
+        };
     }
 
-    private static List<PathMatcher> matchers(List<String> globs) {
+    private static boolean rootLevel(PathMatcher m, Path rel) {
+        return rel.getNameCount() == 1 && m.matches(rel.getFileSystem().getPath("x").resolve(rel));
+    }
+
+    private static List<PathMatcher> matchers(FileSystem fs, List<String> globs) {
         List<PathMatcher> out = new ArrayList<>();
-        if (globs != null) for (String g : globs) out.add(FileSystems.getDefault().getPathMatcher("glob:" + g));
+        if (globs != null) for (String g : globs) out.add(fs.getPathMatcher("glob:" + g));
         return out;
     }
 

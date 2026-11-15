@@ -1,5 +1,6 @@
 package com.modtoolkit.rulebook;
 
+import com.modtoolkit.core.PathKeys;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,11 +30,11 @@ public final class RulebookLint {
         for (String s : skills) files.add(out.resolve(".github/skills/" + s + "/SKILL.md"));
         for (Path f : files) {
             if (!Files.exists(f)) {
-                problems.add(out.relativize(f) + ": missing");
+                problems.add(PathKeys.key(out, f) + ": missing");
                 continue;
             }
             String t = Files.readString(f);
-            String name = out.relativize(f).toString();
+            String name = PathKeys.key(out, f);
             if (t.isBlank()) problems.add(name + ": empty");
             if (UNRESOLVED.matcher(t).find()) problems.add(name + ": unresolved template text");
             Matcher m = CODE_WORD.matcher(t);
