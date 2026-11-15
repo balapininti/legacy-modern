@@ -23,16 +23,21 @@ The toolkit does not translate code. Agents such as Claude Code or GitHub Copilo
 | `rulebook` | Generates `CLAUDE.md` and Copilot instructions from your repository's conventions |
 | `verify` | Decodes captured datasets and generates JUnit tests against them |
 | `api`, `ui` | Web UI for review, target-code links, deviations, gaps and tracking |
-| `deploy` | Compose, Helm, air-gap bundle |
+| `deploy` | Install runbook and the Windows bundle's launcher files. No container images ([ADR 0008](docs/adr/0008-no-docker-windows-bundle.md)) |
 
 ## Develop
 
+Needs JDK 21, Maven (or `./mvnw`), PostgreSQL 17 with pgvector, and Node 24. No containers. PostgreSQL is not run as a service: tests and scripts start their own throwaway servers from its binaries, found through `TOOLKIT_TEST_PG_HOME` (the folder holding `bin/pg_ctl`), else `pg_config` on the PATH, else Homebrew's `postgresql@17`.
+
+- macOS: `brew install postgresql@17 pgvector`
+- Debian or Ubuntu (PGDG repository): `apt install postgresql-17 postgresql-17-pgvector`, then `export TOOLKIT_TEST_PG_HOME=/usr/lib/postgresql/17`
+
 ```bash
-source scripts/env.sh          # JDK 21 and Maven from .tools, Docker host
+source scripts/env.sh          # JDK 21 and Maven from .tools when present
 scripts/fetch-corpora.sh       # pinned CardDemo; --all for the other 9 validation repositories
-./mvnw verify                  # needs Docker
+./mvnw verify                  # each test JVM starts its own PostgreSQL on a free port
 cd ui && npm ci && TOOLKIT_CHECKOUT=.. npm run e2e
-scripts/compose-smoke.sh       # after scripts/build-images.sh
+scripts/dev-pg.sh start        # a persistent dev PostgreSQL on 127.0.0.1:55433 for validate-corpora.py and mcp-probe.py
 ```
 
 No test calls a live LLM. Real model answers are recorded in `testdata/llm-recordings` and replayed.

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Drives the real MCP server over stdio against each validated repo, calling tools on that repo's real data."""
 import json, os, pathlib, subprocess, sys, threading
+import evalpg  # the native dev server: scripts/dev-pg.sh start
 root = pathlib.Path(__file__).resolve().parent.parent
 jar = os.environ.get("TOOLKIT_JAR", str(root / "cli/target/toolkit.jar"))
 class Mcp:
     def __init__(self, db):
-        env = dict(os.environ, TOOLKIT_DB_URL=f"jdbc:postgresql://localhost:55433/{db}", TOOLKIT_DB_USER="toolkit", TOOLKIT_DB_PASSWORD="toolkit", TOOLKIT_USER="probe")
+        env = evalpg.toolkit_env(db, TOOLKIT_USER="probe")
         self.p = subprocess.Popen(["java", "-jar", jar, "mcp", "stdio"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=env, cwd=str(root / ".cache"))
         self.n = 0
         self.rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "probe", "version": "1"}})
@@ -24,7 +25,7 @@ class Mcp:
     def close(self):
         self.p.terminate()
 def sql(db, s):
-    return subprocess.run(["docker", "exec", "toolkit-perf-pg", "psql", "-U", "toolkit", "-d", db, "-At", "-F", "|", "-c", s], capture_output=True, text=True).stdout.strip()
+    return evalpg.query(db, s)
 out = {}
 for n in sys.argv[1:] or ["carddemo", "bankdemo", "bank-of-z", "cbsa", "genapp", "dsf", "taxe-fonciere", "bricks", "cobol-unit-test", "cobol-course"]:
     db = "v_" + n.replace("-", "_"); r = {}; m = Mcp(db)

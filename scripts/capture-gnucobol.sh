@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Runs CardDemo's CBACT04C for real under GnuCOBOL in Docker, through TKDRIVER, and saves every input and output as raw
+# Runs CardDemo's CBACT04C for real under GnuCOBOL (cobc 3.x and python3 on PATH; Linux: apt-get install gnucobol3), through TKDRIVER, and saves every input and output as raw
 # bytes. This stands in for a test LPAR, which this project has no access to: the COBOL really executes, on the same
 # record layouts, but it is GnuCOBOL and not z/OS, so these captures are labeled as such in their manifest.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/testdata/captures/CBACT04C"
 rm -rf "$out"; mkdir -p "$out"
-docker run --rm -i -v "$root/.cache/corpora/carddemo/app:/carddemo:ro" -v "$root/verify/src/main/resources/verify:/verify:ro" -v "$out:/out" ubuntu:24.04 bash -s <<'INNER'
+command -v cobc >/dev/null || { echo "cobc (GnuCOBOL 3.x) not on PATH" >&2; exit 1; }
+work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
+CARDDEMO="$root/.cache/corpora/carddemo/app" VERIFY="$root/verify/src/main/resources/verify" OUT="$out" W="$work" bash -s <<'INNER'
 set -euo pipefail
-apt-get update -qq >/dev/null </dev/null; apt-get install -y -qq gnucobol3 python3 >/dev/null 2>&1 </dev/null
 cobc --version | head -1
-W=/tmp/w; mkdir -p $W; cd $W
-OPTS="-std=ibm -fsign=EBCDIC -I /carddemo/cpy"
+cd "$W"
+OPTS="-std=ibm -fsign=EBCDIC -I $CARDDEMO/cpy"
 cat > CEE3ABD.cbl <<'C'
        IDENTIFICATION DIVISION.
        PROGRAM-ID. CEE3ABD.
@@ -21,8 +22,8 @@ cat > CEE3ABD.cbl <<'C'
            STOP RUN.
 C
 cobc $OPTS -m CEE3ABD.cbl
-cobc $OPTS -m /carddemo/cbl/CBACT04C.cbl
-cobc $OPTS -x -o TKDRIVER /verify/TKDRIVER.cbl
+cobc $OPTS -m "$CARDDEMO/cbl/CBACT04C.cbl"
+cobc $OPTS -x -o TKDRIVER "$VERIFY/TKDRIVER.cbl"
 # A loader and an unloader: the program reads indexed files, and its inputs and outputs are saved as fixed records.
 loader() { # name recsize keypos keylen altkey
   cat > L$1.cbl <<C
@@ -151,19 +152,19 @@ cat > LEN.cbl <<'C'
            DISPLAY 'W-PACK ' LENGTH OF W-PACK.
            STOP RUN.
 C
-cobc -x $OPTS LEN.cbl && ./LEN | tee /out/cobol-record-lengths.txt
+cobc -x $OPTS LEN.cbl && ./LEN | tee "$OUT"/cobol-record-lengths.txt
 cat > make.py <<'P'
-import sys,random
+import os,sys,random
 # Real CardDemo records, with balances varied so the arithmetic has something to do. Overpunch: {ABCDEFGHI +, }JKLMNOPQR -.
 POS="{ABCDEFGHI"; NEG="}JKLMNOPQR"
 def signed(v,w):
     s=str(abs(v)).zfill(w); last=int(s[-1]); return s[:-1]+(NEG[last] if v<0 else POS[last])
 def pad(l,n): return l.rstrip("\r\n").ljust(n)[:n]
 scen=sys.argv[1]; r=random.Random({"run1":1,"run2":2,"run3":3}[scen])
-tcat=[pad(l,50) for l in open("/carddemo/data/ASCII/tcatbal.txt",errors="replace")]
-xref=[pad(l,50) for l in open("/carddemo/data/ASCII/cardxref.txt",errors="replace")]
-acct=[pad(l,300) for l in open("/carddemo/data/ASCII/acctdata.txt",errors="replace")]
-disc=[pad(l,50) for l in open("/carddemo/data/ASCII/discgrp.txt",errors="replace")]
+tcat=[pad(l,50) for l in open(os.environ["CARDDEMO"]+"/data/ASCII/tcatbal.txt",errors="replace")]
+xref=[pad(l,50) for l in open(os.environ["CARDDEMO"]+"/data/ASCII/cardxref.txt",errors="replace")]
+acct=[pad(l,300) for l in open(os.environ["CARDDEMO"]+"/data/ASCII/acctdata.txt",errors="replace")]
+disc=[pad(l,50) for l in open(os.environ["CARDDEMO"]+"/data/ASCII/discgrp.txt",errors="replace")]
 if scen=="run2":
     # No group matches, so every account takes the DEFAULT fallback branch.
     acct=[a[:110]+"NOSUCHGRP ".ljust(10)+a[120:] for a in acct]
@@ -185,12 +186,12 @@ for scen in run1 run2 run3; do
   python3 -c "area=bytes([0,10])+b'2022071800'; open('TKIN','wb').write(bytes([0,len(area),0,0])+area)"
   COB_LIBRARY_PATH=. DD_TKIN=TKIN DD_TKOUT=TKOUT ./TKDRIVER CBACT04C > run.log 2>&1 </dev/null && rc=0 || rc=$?
   DD_INFILE=ACCTFILE DD_OUTFILE=ACCT.out ./UACCT </dev/null
-  d=/out/$scen; mkdir -p $d
-  cp TCAT.in $d/TCATBALF.input; cp XREF.in $d/XREFFILE.input; cp ACCT.in $d/ACCTFILE.input; cp DISC.in $d/DISCGRP.input; cp TKIN $d/TKIN.input
-  cp ACCT.out $d/ACCTFILE.output; cp TRANSACT $d/TRANSACT.output; cp TKOUT $d/TKOUT.output; cp run.log $d/SYSOUT.txt
-  echo "$scen rc=$rc tran_bytes=$(stat -c %s TRANSACT) acct_bytes=$(stat -c %s ACCT.out)"; tail -2 run.log
+  d="$OUT/$scen"; mkdir -p "$d"
+  cp TCAT.in "$d/TCATBALF.input"; cp XREF.in "$d/XREFFILE.input"; cp ACCT.in "$d/ACCTFILE.input"; cp DISC.in "$d/DISCGRP.input"; cp TKIN "$d/TKIN.input"
+  cp ACCT.out "$d/ACCTFILE.output"; cp TRANSACT "$d/TRANSACT.output"; cp TKOUT "$d/TKOUT.output"; cp run.log "$d/SYSOUT.txt"
+  echo "$scen rc=$rc tran_bytes=$(wc -c <TRANSACT | tr -d ' ') acct_bytes=$(wc -c <ACCT.out | tr -d ' ')"; tail -2 run.log
 done
-cat > /out/manifest.json <<J
-{"program":"CBACT04C","source":"gnucobol","runtime":"$(cobc --version | head -1)","cobc_options":"$OPTS","note":"Executed under GnuCOBOL in Docker, not on z/OS. Sign and binary conventions set to match IBM (-std=ibm -fsign=EBCDIC). Character data is ASCII, not EBCDIC.","parm":"2022071800","records":{"TCATBALF":{"copybook":"CVTRA01Y","record":"TRAN-CAT-BAL-RECORD","length":50},"XREFFILE":{"copybook":"CVACT03Y","record":"CARD-XREF-RECORD","length":50},"ACCTFILE":{"copybook":"CVACT01Y","record":"ACCOUNT-RECORD","length":300},"DISCGRP":{"copybook":"CVTRA02Y","record":"DIS-GROUP-RECORD","length":50},"TRANSACT":{"copybook":"CVTRA05Y","record":"TRAN-RECORD","length":350}},"inputs":["TCATBALF","XREFFILE","ACCTFILE","DISCGRP"],"outputs":["ACCTFILE","TRANSACT"]}
+cat > "$OUT/manifest.json" <<J
+{"program":"CBACT04C","source":"gnucobol","runtime":"$(cobc --version | head -1)","cobc_options":"$OPTS","note":"Executed under GnuCOBOL, not on z/OS. Sign and binary conventions set to match IBM (-std=ibm -fsign=EBCDIC). Character data is ASCII, not EBCDIC.","parm":"2022071800","records":{"TCATBALF":{"copybook":"CVTRA01Y","record":"TRAN-CAT-BAL-RECORD","length":50},"XREFFILE":{"copybook":"CVACT03Y","record":"CARD-XREF-RECORD","length":50},"ACCTFILE":{"copybook":"CVACT01Y","record":"ACCOUNT-RECORD","length":300},"DISCGRP":{"copybook":"CVTRA02Y","record":"DIS-GROUP-RECORD","length":50},"TRANSACT":{"copybook":"CVTRA05Y","record":"TRAN-RECORD","length":350}},"inputs":["TCATBALF","XREFFILE","ACCTFILE","DISCGRP"],"outputs":["ACCTFILE","TRANSACT"]}
 J
 INNER
