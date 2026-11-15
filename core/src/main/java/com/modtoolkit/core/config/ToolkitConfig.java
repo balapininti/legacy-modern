@@ -24,9 +24,17 @@ public record ToolkitConfig(
 
     public record Mcp(String transport, String baseUrl, String auth) {}
 
+    /** {@code command} is the Zowe CLI to run; unset means {@link #zoweCommand}'s per-OS default. */
     public record Zos(
             Boolean enabled, String method, String host, String userEnv, String passwordEnv,
-            String jobCard, String workHlq) {}
+            String jobCard, String workHlq, String command) {
+
+        /** {@code zos.command} when set; else {@code zowe.cmd} on Windows (npm's shim there), else {@code zowe}. */
+        public static String zoweCommand(Zos z, String osName) {
+            if (z != null && z.command() != null && !z.command().isBlank()) return z.command();
+            return osName != null && osName.startsWith("Windows") ? "zowe.cmd" : "zowe";
+        }
+    }
 
     public record Target(
             Integer java, String springBoot, Integer angular, String build, String database, String auth,

@@ -16,6 +16,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.EmptyTreeIterator;
+import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +40,7 @@ import org.springframework.stereotype.Service;
 public class LinkCandidates {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern WORD = Pattern.compile("[A-Za-z0-9@#$_-]{3,}");
+    private static final Pattern PARAGRAPH_BREAK = Pattern.compile("\\n[ \\t]*\\n(?:[ \\t]*\\n)*");
 
     private final JdbcTemplate jdbc;
     private final NodeStore nodes;
@@ -92,36 +106,68 @@ public class LinkCandidates {
     }
 
     private int commitReferences(Path repoRoot, Map<String, String> programs, Map<String, List<Long>> unitsByPath) throws Exception {
-        if (!Files.isDirectory(repoRoot.resolve(".git"))) return 0;
-        Process p = new ProcessBuilder("git", "-C", repoRoot.toString(), "log", "--name-only", "--format=%x01%H%x02%s%x02%b%x03")
-                .redirectError(ProcessBuilder.Redirect.DISCARD).start();
-        String log;
-        try {
-            log = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            p.waitFor();
-        } catch (IOException e) {
-            return 0;
-        }
         int n = 0;
-        for (String entry : log.split("\u0001")) {
-            int end = entry.indexOf('\u0003');
-            if (end < 0) continue;
-            String[] head = entry.substring(0, end).split("\u0002", 3);
-            String message = head.length > 1 ? head[1] + " " + (head.length > 2 ? head[2] : "") : "";
+        for (Commit c : commits(repoRoot)) {
             Set<String> cited = new HashSet<>();
-            Matcher w = WORD.matcher(message);
+            Matcher w = WORD.matcher(c.message());
             while (w.find()) {
                 String up = w.group().toUpperCase(Locale.ROOT);
                 if (programs.containsKey(up)) cited.add(up);
             }
             if (cited.isEmpty()) continue;
-            for (String file : entry.substring(end + 1).split("\n")) {
-                for (long unit : unitsByPath.getOrDefault(file.strip(), List.of())) {
-                    for (String c : cited) n += link(c, unit, 0.8f, "commit_ref", Map.of("commit", head[0], "subject", head.length > 1 ? head[1] : ""));
+            for (String file : c.files()) {
+                for (long unit : unitsByPath.getOrDefault(file, List.of())) {
+                    for (String p : cited) n += link(p, unit, 0.8f, "commit_ref", Map.of("commit", c.hash(), "subject", c.subject()));
                 }
             }
         }
         return n;
+    }
+
+    /** One commit as {@code git log --name-only} shows it: message is subject, a space, then body. */
+    record Commit(String hash, String subject, String message, List<String> files) {}
+
+    /**
+     * Every commit reachable from HEAD, newest first, read with JGit so the client needs no git install. Files are the
+     * paths each commit changed, '/'-separated from the repository root, with renames detected as git log does by
+     * default (the new path only). A root commit lists its whole tree; a merge lists nothing, as git log omits merge
+     * diffs unless asked. No repository, no HEAD or an unreadable one is an empty history.
+     */
+    static List<Commit> commits(Path repoRoot) {
+        if (!Files.isDirectory(repoRoot.resolve(".git"))) return List.of();
+        List<Commit> out = new ArrayList<>();
+        try (Repository repo = new FileRepositoryBuilder().setGitDir(repoRoot.resolve(".git").toFile()).setMustExist(true).build();
+             RevWalk walk = new RevWalk(repo);
+             DiffFormatter diff = new DiffFormatter(DisabledOutputStream.INSTANCE)) {
+            ObjectId head = repo.resolve(Constants.HEAD);
+            if (head == null) return List.of();
+            diff.setRepository(repo);
+            diff.setDetectRenames(true);
+            walk.markStart(walk.parseCommit(head));
+            try (ObjectReader reader = repo.newObjectReader()) {
+                for (RevCommit c : walk) {
+                    List<String> files = new ArrayList<>();
+                    if (c.getParentCount() <= 1) {
+                        AbstractTreeIterator parent = c.getParentCount() == 0 ? new EmptyTreeIterator()
+                                : new CanonicalTreeParser(null, reader, walk.parseCommit(c.getParent(0)).getTree());
+                        for (DiffEntry d : diff.scan(parent, new CanonicalTreeParser(null, reader, c.getTree()))) {
+                            files.add(d.getChangeType() == DiffEntry.ChangeType.DELETE ? d.getOldPath() : d.getNewPath());
+                        }
+                    }
+                    String subject = c.getShortMessage();
+                    out.add(new Commit(c.getName(), subject, subject + " " + body(c.getFullMessage()), files));
+                }
+            }
+        } catch (IOException e) {
+            return List.of();
+        }
+        return out;
+    }
+
+    /** git's %b: what follows the subject paragraph and the blank lines after it. */
+    private static String body(String full) {
+        Matcher m = PARAGRAPH_BREAK.matcher(full);
+        return m.find() ? full.substring(m.end()) : "";
     }
 
     /** Keeps a person's decision: the conflict clause never touches status or who confirmed it. */

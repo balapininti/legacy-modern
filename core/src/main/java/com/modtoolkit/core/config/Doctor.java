@@ -105,13 +105,33 @@ public final class Doctor {
             return new CheckResult("zos", Status.FAIL, "zos.host is not set");
         }
         if ("zowe".equals(c.zos().method())) {
-            return probe("zos", "https://" + c.zos().host() + "/zosmf/info");
+            CheckResult cli = zoweCli(ToolkitConfig.Zos.zoweCommand(c.zos(), System.getProperty("os.name")));
+            if (cli.status() == Status.FAIL) return cli;
+            CheckResult zosmf = probe("zos", "https://" + c.zos().host() + "/zosmf/info");
+            return zosmf.status() == Status.PASS ? new CheckResult("zos", Status.PASS, zosmf.detail() + "; " + cli.detail()) : zosmf;
         }
         try (java.net.Socket s = new java.net.Socket()) {
             s.connect(new java.net.InetSocketAddress(c.zos().host(), 21), 5000);
             return new CheckResult("zos", Status.PASS, "FTP port reachable on " + c.zos().host());
         } catch (Exception e) {
             return new CheckResult("zos", Status.FAIL, "FTP port unreachable on " + c.zos().host() + ": " + e.getMessage());
+        }
+    }
+
+    /** The Zowe CLI is the client's install, not ours: check it starts before any capture depends on it. */
+    static CheckResult zoweCli(String command) {
+        try {
+            Process p = new ProcessBuilder(command, "--version").redirectErrorStream(true).start();
+            p.getOutputStream().close();
+            String out = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip();
+            if (!p.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                return new CheckResult("zos", Status.FAIL, command + " --version did not finish");
+            }
+            if (p.exitValue() != 0) return new CheckResult("zos", Status.FAIL, command + " --version exited " + p.exitValue() + ": " + out);
+            return new CheckResult("zos", Status.PASS, "Zowe CLI " + out);
+        } catch (Exception e) {
+            return new CheckResult("zos", Status.FAIL, "cannot run the Zowe CLI '" + command + "' (install it or set zos.command): " + e.getMessage());
         }
     }
 
