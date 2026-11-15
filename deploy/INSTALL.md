@@ -359,7 +359,10 @@ service\service.cmd start
   pgvector; a `-lexical` bundle does not. Everything else works.
 - **"Windows could not find a DLL ... (0xC0000135)":** the PostgreSQL programs did not find the Visual C++ runtime.
   Keep `runtime\jre` complete, or install the Microsoft Visual C++ 2015-2022 Redistributable (x64) from
-  https://aka.ms/vs/17/release/vc_redist.x64.exe (needs an administrator).
+  https://aka.ms/vs/17/release/vc_redist.x64.exe (needs an administrator). PostgreSQL also gives this error when it
+  cannot read its own files: run by an administrator it drops its administrator rights, so a folder your account can
+  read only as an administrator fails. `toolkit.cmd setup` gives your account rights on the install folder; after
+  moving it, run `icacls "C:\Tool Kit\toolkit" /grant "%USERNAME%":(OI)(CI)M`.
 - **The browser or an MCP client rejects the certificate:** trust `data\tls\toolkit.crt` on that machine
   (section 7), and connect with the name the certificate was made for, not an IP address other than `127.0.0.1`.
 - **After a crash or power loss:** `start.cmd` removes stale lock files itself. If the database still does not start,

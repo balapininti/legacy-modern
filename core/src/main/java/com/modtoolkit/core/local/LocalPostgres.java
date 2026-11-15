@@ -376,7 +376,9 @@ public final class LocalPostgres {
     static final int STATUS_DLL_NOT_FOUND = 0xC0000135;
     static final String DLL_HINT = "Windows could not find a DLL the PostgreSQL programs need (exit status 0xC0000135). Usually that is"
             + " the Microsoft Visual C++ runtime: keep the install's runtime\\jre folder complete, or install the Microsoft Visual C++"
-            + " 2015-2022 Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe (needs an administrator).";
+            + " 2015-2022 Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe (needs an administrator)."
+            + " Run by an administrator, PostgreSQL drops its administrator rights, so this also happens when the folder is readable by"
+            + " your account only as an administrator: give your account rights on it (icacls \"<folder>\" /grant \"%USERNAME%\":(OI)(CI)M).";
 
     /** Runs a program with an argument list (no shell), draining its merged output on a separate thread. */
     static Result run(Duration timeout, List<Path> libraryPath, String... command) {
