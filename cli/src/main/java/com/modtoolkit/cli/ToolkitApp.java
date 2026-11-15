@@ -1,19 +1,29 @@
 package com.modtoolkit.cli;
 
+import java.util.Map;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.StandardEnvironment;
 
 /** The one Spring application behind every command and service profile. */
 @SpringBootApplication(scanBasePackages = "com.modtoolkit")
 public class ToolkitApp {
-    /** The REST API behind the web UI; blocks until stopped. */
-    public static ConfigurableApplicationContext api(String... args) {
-        return new SpringApplicationBuilder(ToolkitApp.class).profiles("api").logStartupInfo(false).run(args);
+    /**
+     * The one server an install runs: web UI, REST API and MCP in a single context, so start-up work such as the
+     * first-run admin happens once. HTTPS unless {@code plainHttp}; a missing or half-set certificate fails here,
+     * before Spring starts, with the variables to set.
+     */
+    public static ConfigurableApplicationContext server(boolean plainHttp, String... args) {
+        Map<String, Object> props = plainHttp ? Map.of("server.port", "${TOOLKIT_API_PORT:8080}") : ServerTls.properties(new StandardEnvironment());
+        // First, so the certificate the environment names is the one used, whatever a config file says.
+        return new SpringApplicationBuilder(ToolkitApp.class).profiles("server").logStartupInfo(false)
+                .initializers(ctx -> ctx.getEnvironment().getPropertySources().addFirst(new MapPropertySource("toolkit-serve", props))).run(args);
     }
 
-    /** The shared MCP server over Streamable HTTP; blocks until stopped. */
+    /** MCP alone over plain Streamable HTTP, for those who run it apart from the server. */
     public static ConfigurableApplicationContext mcpHttp(String... args) {
         return new SpringApplicationBuilder(ToolkitApp.class).profiles("mcp").logStartupInfo(false).run(args);
     }

@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -41,6 +42,11 @@ public class ApiErrors {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Map<String, Object>> other(Exception e) {
+        // Spring's own answers (no such path or file, wrong method, wrong media type) keep their status.
+        if (e instanceof ErrorResponse r && r.getStatusCode().is4xxClientError()) {
+            HttpStatus s = HttpStatus.valueOf(r.getStatusCode().value());
+            return body(s, s.name(), s == HttpStatus.NOT_FOUND ? "nothing is at this path" : s.getReasonPhrase(), "see the API documentation");
+        }
         log.error("request failed", e);
         return body(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", "the request failed unexpectedly", "the error is in the server log");
     }

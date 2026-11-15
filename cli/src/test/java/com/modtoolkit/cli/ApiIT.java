@@ -89,7 +89,7 @@ class ApiIT {
         }
         config = Files.createTempDirectory("cfg").resolve("toolkit.yaml");
         Files.writeString(config, "client: t\nsource:\n  root: " + CORPUS + "\n");
-        ProcessBuilder b = new ProcessBuilder(java(), "-jar", JAR.toString(), "serve").redirectErrorStream(true).redirectOutput(new File(REPO.resolve("cli/target/api2-it.log").toString()));
+        ProcessBuilder b = new ProcessBuilder(java(), "-jar", JAR.toString(), "serve", "--plain-http").redirectErrorStream(true).redirectOutput(new File(REPO.resolve("cli/target/api2-it.log").toString()));
         b.environment().putAll(env());
         b.environment().put("TOOLKIT_API_PORT", String.valueOf(port));
         b.environment().put("TOOLKIT_ADMIN_PASSWORD", "first-run-secret");

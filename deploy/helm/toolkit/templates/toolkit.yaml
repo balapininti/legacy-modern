@@ -25,7 +25,7 @@ spec:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args: ["serve"]
+          args: ["serve", "--plain-http"]
           ports: [{containerPort: 8080}]
           env:
             {{- include "toolkit.env" . | nindent 12 }}
