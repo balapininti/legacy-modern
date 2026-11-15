@@ -103,9 +103,15 @@ class ToolkitConfigTest {
         Doctor.CheckResult missing = Doctor.zoweCli(dir.resolve("no-such-zowe").toString());
         assertThat(missing.status()).isEqualTo(Doctor.Status.FAIL);
         assertThat(missing.detail()).contains("no-such-zowe").contains("zos.command");
-        Path fake = dir.resolve("zowe");
-        Files.writeString(fake, "#!/bin/sh\necho 8.1.0\n");
-        Files.setPosixFilePermissions(fake, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+        Path fake;
+        if (System.getProperty("os.name", "").startsWith("Windows")) {
+            fake = dir.resolve("zowe.cmd");
+            Files.writeString(fake, "@echo 8.1.0\r\n");
+        } else {
+            fake = dir.resolve("zowe");
+            Files.writeString(fake, "#!/bin/sh\necho 8.1.0\n");
+            Files.setPosixFilePermissions(fake, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
         Doctor.CheckResult found = Doctor.zoweCli(fake.toString());
         assertThat(found.status()).isEqualTo(Doctor.Status.PASS);
         assertThat(found.detail()).contains("8.1.0");

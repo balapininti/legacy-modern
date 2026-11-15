@@ -26,9 +26,10 @@ class PathKeysTest {
             assertThat(PathKeys.key(fs.getPath("/src"), fs.getPath("/src/app/cbl/X.cbl"))).isEqualTo("app/cbl/X.cbl");
             assertThat(PathKeys.key(fs.getPath("/src"), fs.getPath("/src/X.cbl"))).isEqualTo("X.cbl");
         }
-        Path root = Path.of("/tmp/src");
-        Path file = root.resolve("a/b/C.java");
-        assertThat(PathKeys.key(root, file)).isEqualTo(root.relativize(file).toString());
+        // The default file system too, whatever its separator.
+        Path root = Path.of("src").toAbsolutePath();
+        Path file = root.resolve("a").resolve("b").resolve("C.java");
+        assertThat(PathKeys.key(root, file)).isEqualTo("a/b/C.java");
     }
 
     @Test

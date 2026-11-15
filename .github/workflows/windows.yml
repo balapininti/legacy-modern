@@ -185,9 +185,26 @@ jobs:
       - name: Fetch pinned corpora
         shell: bash
         run: scripts/fetch-corpora.sh
+      # Every module's tests run even when an earlier one fails, so one run shows every Windows failure.
       - name: Build and test
         shell: cmd
-        run: call mvnw.cmd -B verify
+        run: call mvnw.cmd -B verify -Dmaven.test.failure.ignore=true
+      - name: Test results
+        shell: python
+        run: |
+          import glob, sys, xml.etree.ElementTree as ET
+          total = skipped = 0; bad = []
+          for f in glob.glob("**/target/*-reports/TEST-*.xml", recursive=True):
+              for tc in ET.parse(f).getroot().iter("testcase"):
+                  total += 1
+                  if tc.find("skipped") is not None: skipped += 1
+                  for kind in ("failure", "error"):
+                      e = tc.find(kind)
+                      if e is not None:
+                          bad.append(f"{kind.upper()} {tc.get('classname')}.{tc.get('name')}: {(e.get('message') or '')[:300]}")
+          print(f"{total} tests, {skipped} skipped, {len(bad)} failed")
+          print("\n".join(bad))
+          sys.exit(1 if bad or total == 0 else 0)
       - name: Upload test reports and logs
         if: failure()
         uses: actions/upload-artifact@v4
