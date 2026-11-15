@@ -2,6 +2,8 @@
 
 Date: 2026-11-02. On branch `main`, local only: nothing has been pushed or published.
 
+2026-11-14: container tooling was removed from the repository: Compose, Helm, Jib images and Testcontainers. The client install becomes a Windows zip with a portable PostgreSQL 17, and tests run on a native PostgreSQL. See [ADR 0008](adr/0008-no-docker-windows-bundle.md). The M9 result below was measured on the Compose install that no longer exists.
+
 All milestones M0 to M9 are built. `mvn clean verify` passes 179 tests. All 12 browser tests pass. The license gate passes on 214 Java dependencies and 22 shipped UI packages.
 
 ## Acceptance
@@ -28,7 +30,7 @@ All milestones M0 to M9 are built. `mvn clean verify` passes 179 tests. All 12 b
 - A real identity provider. JWTs were tested against a local issuer.
 - GitHub Actions: `ci.yml` has never run.
 - Azure OpenAI, Bedrock, OpenAI and Anthropic as chat providers. They are constructed, not called. Only local Ollama was really used.
-- Helm install on a cluster.
+- Helm install on a cluster. Helm was removed on 2026-11-14 (ADR 0008).
 - A hosted embedding model.
 
 ## Known gaps

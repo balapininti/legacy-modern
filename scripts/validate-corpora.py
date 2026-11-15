@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Runs the built toolkit over the owner's validation repos and records what happened, failures included."""
 import json, os, pathlib, subprocess, sys, time
+import evalpg  # the native dev server: scripts/dev-pg.sh start
 root = pathlib.Path(__file__).resolve().parent.parent
 REPOS = {
     "carddemo": "https://github.com/aws-samples/aws-mainframe-modernization-carddemo",
@@ -28,9 +29,10 @@ for n in names:
         if r.returncode: results[n] = {"error": r.stderr[-300:]}; print(n, "CLONE FAILED"); continue
     sha = sh("git", "-C", str(d), "rev-parse", "HEAD").stdout.strip()
     db = "v_" + n.replace("-", "_")
-    sh("docker", "exec", "toolkit-perf-pg", "psql", "-U", "toolkit", "-d", "toolkit", "-qc", f"DROP DATABASE IF EXISTS {db}")
-    sh("docker", "exec", "toolkit-perf-pg", "psql", "-U", "toolkit", "-d", "toolkit", "-qc", f"CREATE DATABASE {db}")
-    env = dict(os.environ, TOOLKIT_DB_URL=f"jdbc:postgresql://localhost:55433/{db}", TOOLKIT_DB_USER="toolkit", TOOLKIT_DB_PASSWORD="toolkit")
+    evalpg.psql("postgres", "-qc", f"DROP DATABASE IF EXISTS {db}")
+    c = evalpg.psql("postgres", "-qc", f"CREATE DATABASE {db}")
+    if c.returncode: sys.exit(f"cannot create database {db} (is scripts/dev-pg.sh start running?): {c.stderr.strip()}")
+    env = evalpg.toolkit_env(db)
     rep = out / f"{n}.json"; t0 = time.time()
     r = subprocess.run(["java", "-Xmx8g", "-jar", jar, "discover", "--root", str(d), "--threads", "8", "--member-timeout-seconds", "120", "--report", str(rep)], capture_output=True, text=True, env=env, cwd=out)
     el = round(time.time() - t0, 1)

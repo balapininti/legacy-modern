@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
-# Starts and stops a throwaway seeded stack for the UI e2e proof: its own Postgres container, the real toolkit jar
+# Starts and stops a throwaway seeded stack for the UI e2e proof: its own native PostgreSQL (scripts/dev-pg.sh with
+# TOOLKIT_TEST_PG_HOME, else pg_config's, else Homebrew postgresql@17, on a free port), the real toolkit jar
 # (discover, replayed knowledge pass, index, capture import, tokens, serve) and a static server for the production UI.
 #
 #   TOOLKIT_CHECKOUT=/path/to/main/checkout e2e/stack.sh start|stop|status
 #
 # TOOLKIT_CHECKOUT is where the gitignored scripts/env.sh tools and .cache/corpora live; it defaults to this repository.
-# Everything it creates is under e2e/.stack (gitignored) and in the container named below. Nothing else is touched.
+# Everything it creates, the database files included, is under e2e/.stack (gitignored). Nothing else is touched.
 set -euo pipefail
 
 UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(cd "$UI_DIR/.." && pwd)"
 CHECKOUT="${TOOLKIT_CHECKOUT:-$REPO}"
 STATE="$UI_DIR/e2e/.stack"
-PG_NAME="toolkit-ui-e2e-pg"
 PG_PASSWORD="ui-e2e-only"
 ADMIN_PASSWORD="ui-e2e-admin-only"
 JAR="$REPO/cli/target/toolkit.jar"
 CORPUS="${TOOLKIT_CORPUS:-$CHECKOUT/.cache/corpora/carddemo}"
+export TOOLKIT_DEV_PG_DIR="$STATE/pg" TOOLKIT_EVAL_PG_USER=toolkit TOOLKIT_EVAL_PG_PASSWORD="$PG_PASSWORD"
+pg() { "$REPO/scripts/dev-pg.sh" "$@"; }
 
 # shellcheck disable=SC1091
 source "$CHECKOUT/scripts/env.sh"
@@ -30,7 +32,10 @@ stop() {
       rm -f "$STATE/$f.pid"
     fi
   done
-  docker rm -f "$PG_NAME" >/dev/null 2>&1 || true
+  if [ -f "$STATE/pg.port" ]; then
+    TOOLKIT_EVAL_PG_PORT="$(cat "$STATE/pg.port")" pg destroy || true
+    rm -f "$STATE/pg.port"
+  fi
   rm -f "$STATE/stack.env"
 }
 
@@ -46,11 +51,11 @@ start() {
   chmod 700 "$STATE"
 
   echo "[stack] postgres"
-  docker run -d --name "$PG_NAME" -e POSTGRES_PASSWORD="$PG_PASSWORD" -e POSTGRES_USER=toolkit -e POSTGRES_DB=toolkit \
-    -p 127.0.0.1::5432 pgvector/pgvector:pg16 -c max_connections=200 >/dev/null
-  until docker exec "$PG_NAME" psql -U toolkit -d toolkit -c 'select 1' >/dev/null 2>&1; do sleep 1; done
   local pg_port
-  pg_port="$(docker port "$PG_NAME" 5432/tcp | head -1 | sed 's/.*://')"
+  pg_port="$(free_port)"
+  export TOOLKIT_EVAL_PG_PORT="$pg_port"
+  echo "$pg_port" > "$STATE/pg.port"
+  TOOLKIT_DEV_PG_MAX_CONNECTIONS=200 pg start > "$STATE/pg-start.log" 2>&1 || { cat "$STATE/pg-start.log" >&2; exit 1; }
   export TOOLKIT_DB_URL="jdbc:postgresql://127.0.0.1:$pg_port/toolkit" TOOLKIT_DB_USER=toolkit TOOLKIT_DB_PASSWORD="$PG_PASSWORD"
 
   echo "[stack] target repository with a commit citing CBACT04C"
@@ -89,7 +94,7 @@ YAML
   toolkit capture import --dir testdata/captures/CBACT04C --encoding utf-8 > "$STATE/capture.log" 2>&1
 
   echo "[stack] a candidate deviation, as the MCP tool record_deviation or tests report would leave it"
-  docker exec -i "$PG_NAME" psql -q -U toolkit -d toolkit >/dev/null <<'SQL'
+  pg psql -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 INSERT INTO deviation (legacy_ref, modern_ref, change, reason, comparison_rule, status) VALUES
  ('{"program":"CBACT04C","field":"TRAN-ORIG-TS"}', '{"path":"src/main/java/com/acme/card/batch/InterestCalculator.java"}',
   'Timestamp comes from the run clock', 'Run time is expected to differ between the mainframe and the JVM', '{"ignore":true}', 'candidate'),
@@ -134,6 +139,6 @@ ENV
 case "${1:-}" in
   start) start ;;
   stop) stop ;;
-  status) docker ps --filter "name=$PG_NAME" --format '{{.Names}} {{.Status}} {{.Ports}}'; [ -f "$STATE/stack.env" ] && grep -E '^(UI|API)_URL' "$STATE/stack.env" ;;
+  status) [ -f "$STATE/pg.port" ] && TOOLKIT_EVAL_PG_PORT="$(cat "$STATE/pg.port")" pg status; [ -f "$STATE/stack.env" ] && grep -E '^(UI|API)_URL' "$STATE/stack.env" ;;
   *) echo "usage: stack.sh start|stop|status" >&2; exit 2 ;;
 esac

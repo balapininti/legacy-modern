@@ -4,10 +4,11 @@ Independent check: counts statements in the raw source with no parser involved, 
 Runs after validate-corpora.py. A difference is printed with the files it is in, because each one needs explaining.
 """
 import json, os, pathlib, re, subprocess, sys
+import evalpg  # the native dev server: scripts/dev-pg.sh start
 root = pathlib.Path(__file__).resolve().parent.parent
 corp = root / ".cache/corpora"
 def q(db, s):
-    return subprocess.run(["docker", "exec", "toolkit-perf-pg", "psql", "-U", "toolkit", "-d", db, "-At", "-F", "|", "-c", s], capture_output=True, text=True).stdout.strip()
+    return evalpg.query(db, s)
 def code_lines(p):
     out = []
     for i, l in enumerate(open(p, errors="replace"), 1):

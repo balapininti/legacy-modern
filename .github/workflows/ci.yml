@@ -5,6 +5,9 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      # Tests and the UI e2e stack start their own throwaway PostgreSQL from these binaries, on free ports.
+      TOOLKIT_TEST_PG_HOME: /usr/lib/postgresql/17
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -12,6 +15,12 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - name: PostgreSQL 17 with pgvector (PGDG), native
+        working-directory: .
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-17 postgresql-17-pgvector
       - name: Fetch pinned corpora
         run: scripts/fetch-corpora.sh
       - name: Build and test
@@ -20,6 +29,9 @@ jobs:
         run: python3 scripts/license-check.py
   ui:
     runs-on: ubuntu-latest
+    env:
+      # Tests and the UI e2e stack start their own throwaway PostgreSQL from these binaries, on free ports.
+      TOOLKIT_TEST_PG_HOME: /usr/lib/postgresql/17
     defaults:
       run:
         working-directory: ui
@@ -35,6 +47,12 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: ui/package-lock.json
+      - name: PostgreSQL 17 with pgvector (PGDG), native
+        working-directory: .
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-17 postgresql-17-pgvector
       - name: Fetch pinned corpora
         working-directory: .
         run: scripts/fetch-corpora.sh
@@ -47,17 +65,3 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build the UI and prove it in a browser
         run: npm run e2e
-  compose-smoke:
-    runs-on: ubuntu-latest
-    needs: verify
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Build the images
-        run: scripts/build-images.sh
-      - name: Install from scratch through a first MCP query
-        run: scripts/compose-smoke.sh
