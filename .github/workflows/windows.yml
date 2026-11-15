@@ -55,3 +55,147 @@ jobs:
           name: pgvector-win-x64
           path: pgvector-win-x64
           if-no-files-found: error
+
+  # The client bundle, built on Windows from this commit: the jar, the UI, the pgvector build above and the pinned
+  # downloads (scripts/build-windows-bundle.py checks every SHA-256).
+  bundle:
+    needs: pgvector
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Cache the pinned downloads
+        uses: actions/cache@v4
+        with:
+          path: .cache/downloads
+          key: bundle-downloads-${{ hashFiles('scripts/build-windows-bundle.py') }}
+      - name: Build the jar and its SBOM
+        shell: cmd
+        run: |
+          call mvnw.cmd -B -q -DskipTests -DskipITs package || exit /b 1
+          call mvnw.cmd -B -q org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeAggregateBom || exit /b 1
+      - name: Build the UI
+        working-directory: ui
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - uses: actions/download-artifact@v4
+        with:
+          name: pgvector-win-x64
+          path: pgvector-win-x64
+      - name: Build the bundle
+        run: python scripts/build-windows-bundle.py --jar cli/target/toolkit.jar --ui ui/dist/ui/browser --pgvector pgvector-win-x64 --sbom target/bom.json --out target
+      - name: What the PostgreSQL programs and vector.dll load (dumpbin)
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VS=%%i"
+          call "%VS%\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
+          mkdir dumpbin-check
+          tar -xf target\toolkit-*-windows-x64.zip -C dumpbin-check toolkit/runtime/pgsql/bin/postgres.exe toolkit/runtime/pgsql/bin/initdb.exe toolkit/runtime/pgsql/bin/pg_ctl.exe toolkit/runtime/pgsql/lib/vector.dll toolkit/runtime/pgsql/bin/icuuc67.dll || exit /b 1
+          for %%f in (dumpbin-check\toolkit\runtime\pgsql\bin\postgres.exe dumpbin-check\toolkit\runtime\pgsql\bin\initdb.exe dumpbin-check\toolkit\runtime\pgsql\bin\pg_ctl.exe dumpbin-check\toolkit\runtime\pgsql\lib\vector.dll dumpbin-check\toolkit\runtime\pgsql\bin\icuuc67.dll) do (
+            echo ==== %%~nxf
+            dumpbin /nologo /dependents "%%f" | findstr /i "\.dll"
+          )
+      - name: Zip size and checksum
+        shell: pwsh
+        run: Get-ChildItem target\toolkit-*-windows-x64.zip* | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }; Get-Content target\*.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: toolkit-windows-x64
+          path: |
+            target/toolkit-*-windows-x64.zip
+            target/toolkit-*-windows-x64.zip.sha256
+          compression-level: 0
+          if-no-files-found: error
+
+  # The client's whole day one, from the zip, in a folder whose path has a space: scripts/windows-smoke.py.
+  smoke:
+    needs: bundle
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: toolkit-windows-x64
+          path: bundle
+      - name: Smoke test the bundle
+        shell: pwsh
+        run: |
+          $zip = (Get-ChildItem bundle\toolkit-*-windows-x64.zip).FullName
+          $want = (Get-Content "$zip.sha256").Split(' ')[0]
+          $got = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $want) { throw "bundle checksum $got does not match $want" }
+          python scripts\windows-smoke.py --zip $zip --artifacts smoke-logs --hide-vcruntime
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Upload the smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-smoke-logs
+          path: smoke-logs
+          retention-days: 14
+
+  # The Java suite on Windows, against the bundle's PostgreSQL (the EDB zip plus our pgvector build).
+  test:
+    needs: pgvector
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      TOOLKIT_TEST_PG_HOME: C:\pgtest\pgsql
+    steps:
+      - name: Check out with LF line ends, as on Linux (the CRLF case is the smoke job's)
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/download-artifact@v4
+        with:
+          name: pgvector-win-x64
+          path: pgvector-win-x64
+      - name: PostgreSQL 17 from the EDB zip, with pgvector
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://get.enterprisedb.com/postgresql/postgresql-$env:PG_VERSION-windows-x64-binaries.zip" -OutFile pg.zip
+          $h = (Get-FileHash pg.zip -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne $env:PG_SHA256) { throw "pg.zip checksum $h does not match" }
+          New-Item -ItemType Directory C:\pgtest | Out-Null
+          tar -xf pg.zip -C C:\pgtest --exclude "pgsql/pgAdmin 4/*" --exclude "pgsql/doc/*" --exclude "pgsql/StackBuilder/*"
+          if ($LASTEXITCODE) { throw "tar failed" }
+          Copy-Item pgvector-win-x64\lib\vector.dll C:\pgtest\pgsql\lib\
+          Copy-Item pgvector-win-x64\share\extension\vector* C:\pgtest\pgsql\share\extension\
+          & C:\pgtest\pgsql\bin\pg_config.exe --version
+      - name: Fetch pinned corpora
+        shell: bash
+        run: scripts/fetch-corpora.sh
+      - name: Build and test
+        shell: cmd
+        run: call mvnw.cmd -B verify
+      - name: Upload test reports and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-reports
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+            **/target/*.log
+          if-no-files-found: ignore
+          retention-days: 14
