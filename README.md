@@ -40,4 +40,11 @@ cd ui && npm ci && TOOLKIT_CHECKOUT=.. npm run e2e
 scripts/dev-pg.sh start        # a persistent dev PostgreSQL on 127.0.0.1:55433 for validate-corpora.py and mcp-probe.py
 ```
 
+The Windows client bundle (`target/toolkit-<version>-windows-x64.zip`; CI builds it on Windows in `.github/workflows/windows.yml` and proves it with `scripts/windows-smoke.py`):
+
+```bash
+./mvnw -B -q -DskipTests -DskipITs package && (cd ui && npm ci && npm run build)
+python3 scripts/build-windows-bundle.py --jar cli/target/toolkit.jar --ui ui/dist/ui/browser --pgvector <pgvector-win-x64 artifact, or none> --out target
+```
+
 No test calls a live LLM. Real model answers are recorded in `testdata/llm-recordings` and replayed.
