@@ -485,7 +485,10 @@ class Smoke:
         hidden = []
         jre_bin = self.install / "runtime" / "jre" / "bin"
         minimal = dict(self.base_env, PATH=f"{sys32};{sys32.parent}")
-        tmp = pathlib.Path(tempfile.mkdtemp(prefix="vc-", dir=str(self.install / "data")))
+        # Not mkdtemp: since Python 3.12.4 it gives the folder an owner-only ACL, and the owner of what an elevated
+        # process creates is Administrators, which PostgreSQL's restricted token cannot use.
+        tmp = self.install / "data" / f"vc-check-{os.getpid()}"
+        tmp.mkdir()
         try:
             for n in names:
                 p = sys32 / n
