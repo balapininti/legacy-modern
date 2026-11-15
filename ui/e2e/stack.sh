@@ -7,7 +7,7 @@
 #
 # TOOLKIT_CHECKOUT is where the gitignored scripts/env.sh tools and .cache/corpora live; it defaults to this repository.
 # Everything it creates, the database files included, is under e2e/.stack (gitignored). Nothing else is touched.
-set -euo pipefail
+set -Eeuo pipefail
 
 UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(cd "$UI_DIR/.." && pwd)"
@@ -19,6 +19,23 @@ JAR="$REPO/cli/target/toolkit.jar"
 CORPUS="${TOOLKIT_CORPUS:-$CHECKOUT/.cache/corpora/carddemo}"
 export TOOLKIT_DEV_PG_DIR="$STATE/pg" TOOLKIT_EVAL_PG_USER=toolkit TOOLKIT_EVAL_PG_PASSWORD="$PG_PASSWORD"
 pg() { "$REPO/scripts/dev-pg.sh" "$@"; }
+
+# Never fail silently: any failing command prints where it failed and the tail of every log the stack has written.
+dump_logs() {
+  local f
+  for f in "$STATE"/*.log "$STATE"/pg/*.log; do
+    [ -f "$f" ] || continue
+    echo "----- $f (last 60 lines) -----" >&2
+    tail -n 60 "$f" >&2 || true
+  done
+}
+on_error() {
+  local rc=$? line=$1
+  echo "[stack] FAILED (exit $rc) at e2e/stack.sh line $line: $BASH_COMMAND" >&2
+  dump_logs
+  exit "$rc"
+}
+trap 'on_error $LINENO' ERR
 
 # shellcheck disable=SC1091
 source "$CHECKOUT/scripts/env.sh"
@@ -55,7 +72,7 @@ start() {
   pg_port="$(free_port)"
   export TOOLKIT_EVAL_PG_PORT="$pg_port"
   echo "$pg_port" > "$STATE/pg.port"
-  TOOLKIT_DEV_PG_MAX_CONNECTIONS=200 pg start > "$STATE/pg-start.log" 2>&1 || { cat "$STATE/pg-start.log" >&2; exit 1; }
+  TOOLKIT_DEV_PG_MAX_CONNECTIONS=200 pg start > "$STATE/pg-start.log" 2>&1 || { echo "[stack] postgres did not start" >&2; dump_logs; exit 1; }
   export TOOLKIT_DB_URL="jdbc:postgresql://127.0.0.1:$pg_port/toolkit" TOOLKIT_DB_USER=toolkit TOOLKIT_DB_PASSWORD="$PG_PASSWORD"
 
   echo "[stack] target repository with a commit citing CBACT04C"
@@ -87,7 +104,7 @@ YAML
   local rc=0
   toolkit knowledge run -c "$yaml" --replay-from testdata/llm-recordings --programs CBACT04C,COSGN00C,CBTRN02C > "$STATE/knowledge.log" 2>&1 || rc=$?
   # 3 means some unit had no recording, which is expected here.
-  if [ "$rc" != 0 ] && [ "$rc" != 3 ]; then echo "knowledge run exited $rc, see $STATE/knowledge.log" >&2; exit 1; fi
+  if [ "$rc" != 0 ] && [ "$rc" != 3 ]; then echo "[stack] knowledge run exited $rc" >&2; dump_logs; exit 1; fi
   echo "[stack] index"
   toolkit index > "$STATE/index.log" 2>&1
   echo "[stack] capture import"
@@ -115,7 +132,7 @@ SQL
     curl -fs "http://127.0.0.1:$api_port/actuator/health" >/dev/null 2>&1 && break
     sleep 1
   done
-  curl -fs "http://127.0.0.1:$api_port/actuator/health" >/dev/null || { echo "api did not start, see $STATE/api.log" >&2; exit 1; }
+  curl -fs "http://127.0.0.1:$api_port/actuator/health" >/dev/null || { echo "[stack] api did not start" >&2; dump_logs; exit 1; }
 
   ui_port="$(free_port)"
   nohup node "$UI_DIR/e2e/serve.mjs" "$UI_DIR/dist/ui/browser" "$ui_port" "$api_port" > "$STATE/ui.log" 2>&1 &

@@ -1,5 +1,5 @@
-.tools/
-.cache/
+.tools
+.cache
 third_party/src/
 target/
 node_modules/

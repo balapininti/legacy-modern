@@ -27,6 +27,17 @@ jobs:
         run: ./mvnw -B verify
       - name: License gate
         run: python3 scripts/license-check.py
+      - name: Upload test reports and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-reports
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+            **/target/*.log
+          if-no-files-found: ignore
+          retention-days: 14
   ui:
     runs-on: ubuntu-latest
     env:
@@ -65,3 +76,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build the UI and prove it in a browser
         run: npm run e2e
+      - name: Upload e2e stack logs and Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-e2e-logs
+          path: |
+            ui/e2e/.stack/*.log
+            ui/e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
