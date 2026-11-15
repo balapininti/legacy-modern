@@ -5,14 +5,13 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.modtoolkit.core.testdb.TestPostgres;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * A floor for what CI can measure with no model at all: lexical search over parsed code alone. The hybrid figures need
@@ -20,7 +19,7 @@ import org.testcontainers.utility.DockerImageName;
  */
 class RetrievalEvalIT {
     static final Path REPO = Path.of("..").toAbsolutePath().normalize();
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    static TestPostgres.Database pg;
 
     private static String toolkit(String... args) throws Exception {
         List<String> cmd = new ArrayList<>(List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-jar", REPO.resolve("cli/target/toolkit.jar").toString()));
@@ -37,7 +36,7 @@ class RetrievalEvalIT {
     void lexicalSearchHoldsItsFloorOnBothQuestionSets() throws Exception {
         Path corpus = REPO.resolve(".cache/corpora/carddemo");
         assumeTrue(Files.isDirectory(corpus.resolve("app/cbl")));
-        pg.start();
+        pg = TestPostgres.newDatabase();
         toolkit("discover", "--root", corpus.toString(), "--threads", "8");
         toolkit("index");
         ObjectMapper om = new ObjectMapper();

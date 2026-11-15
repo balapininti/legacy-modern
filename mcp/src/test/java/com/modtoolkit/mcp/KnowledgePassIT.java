@@ -2,6 +2,7 @@ package com.modtoolkit.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.modtoolkit.core.testdb.TestPostgres;
 import com.modtoolkit.discovery.DiscoverOptions;
 import com.modtoolkit.discovery.DiscoveryService;
 import com.modtoolkit.knowledge.KnowledgeJobConfig;
@@ -26,17 +27,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /** Module 2 against a scripted model: every control the spec names, with no network involved. */
 @SpringBootTest(properties = {"spring.batch.job.enabled=false", "spring.ai.mcp.server.enabled=false", "spring.main.web-application-type=none", "spring.datasource.hikari.maximum-pool-size=16", "spring.datasource.hikari.connection-init-sql=SET lock_timeout = '30s'"})
 class KnowledgePassIT {
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
-
-    static {
-        pg.start();
-    }
+    static final TestPostgres.Database pg = TestPostgres.newDatabase();
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {

@@ -16,8 +16,7 @@
     <dependency><groupId>io.micrometer</groupId><artifactId>micrometer-registry-prometheus</artifactId></dependency>
     <dependency><groupId>info.picocli</groupId><artifactId>picocli</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
-    <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>
-    <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>com.modtoolkit</groupId><artifactId>toolkit-core</artifactId><version>${project.version}</version><type>test-jar</type><scope>test</scope></dependency>
   </dependencies>
   <profiles>
     <!-- Local image for Compose and the air-gap bundle: mvn -Pimage package. Base image: deploy/base. -->

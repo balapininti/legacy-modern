@@ -2,6 +2,7 @@ package com.modtoolkit.discovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.modtoolkit.core.testdb.TestPostgres;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,18 +16,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(properties = {"spring.batch.job.enabled=false", "spring.datasource.hikari.maximum-pool-size=24", "spring.datasource.hikari.connection-init-sql=SET lock_timeout = '30s'"})
-@Testcontainers
 class DiscoverJobIT {
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
-
-    static {
-        pg.start();
-    }
+    static final TestPostgres.Database pg = TestPostgres.newDatabase();
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
