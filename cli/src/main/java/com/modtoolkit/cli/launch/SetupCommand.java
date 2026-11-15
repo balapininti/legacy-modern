@@ -109,6 +109,7 @@ public class SetupCommand implements Callable<Integer> {
         System.out.println("made a self-signed certificate for " + host + ", localhost and 127.0.0.1: " + home.keystore());
         System.out.println("the certificate for clients to trust (no key): " + home.certificate());
 
+        if (Home.WINDOWS) grantCurrentUser(home.root());
         pg.init(Launcher.PG_SUPERUSER, env.get(Launcher.PG_SUPERUSER_PASSWORD));
         try {
             pg.start(Launcher.PG_START);
@@ -212,6 +213,36 @@ public class SetupCommand implements Callable<Integer> {
         if (h == null) return "localhost";
         h = h.toLowerCase(Locale.ROOT);
         return HOSTNAME.matcher(h).matches() ? h : "localhost";
+    }
+
+    /**
+     * Gives the current user, by SID, modify rights on the install folder, inherited by everything in it. PostgreSQL
+     * refuses to run with administrator rights: started by an administrator, initdb, pg_ctl and postgres re-run
+     * themselves with a token in which the Administrators group no longer grants anything. A folder whose ACL lets
+     * the user in only as an administrator (files an elevated process unpacked under a profile that grants just
+     * SYSTEM, Administrators and OWNER RIGHTS, as on the GitHub runner) then cannot even load its own DLLs: initdb
+     * fails with 0xC0000135. Best effort: a standard user who unpacked the zip already has these rights.
+     */
+    static void grantCurrentUser(Path root) {
+        try {
+            Process who = new ProcessBuilder("whoami", "/user", "/fo", "csv", "/nh").redirectErrorStream(true).start();
+            who.getOutputStream().close();
+            String out = new String(who.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+            who.waitFor();
+            java.util.regex.Matcher m = Pattern.compile("\"(S-1-[0-9-]+)\"").matcher(out);
+            if (!m.find()) {
+                System.err.println("toolkit setup: could not read your account's SID (whoami /user: " + out + "); folder rights unchanged");
+                return;
+            }
+            Process icacls = new ProcessBuilder("icacls", root.toString(), "/grant", "*" + m.group(1) + ":(OI)(CI)M").redirectErrorStream(true).start();
+            icacls.getOutputStream().close();
+            String res = new String(icacls.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+            if (icacls.waitFor() != 0) System.err.println("toolkit setup: icacls could not give you rights on " + root + ": " + res);
+        } catch (IOException e) {
+            System.err.println("toolkit setup: folder rights unchanged: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     static void deleteTree(Path root) throws IOException {

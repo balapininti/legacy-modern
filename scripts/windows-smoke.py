@@ -284,27 +284,6 @@ class Smoke:
             lines.append(f"{exe}: missing {missing or 'none'}; from outside the install and Windows: {outside or 'none'}")
         sys32 = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
         lines.append("System32 has: " + ", ".join(n for n in ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll") if (sys32 / n).is_file()))
-        initdb = str(self.install / "runtime" / "pgsql" / "bin" / "initdb.exe")
-        tmp = pathlib.Path(tempfile.mkdtemp(prefix="diag ", dir=str(self.install.parent)))
-        (tmp / "pw").write_text("x\n")
-        jre_path = dict(self.base_env, PATH=self.base_env.get("PATH", "") + os.pathsep + str(self.install / "runtime" / "jre" / "bin"))
-        for label, argv, env in (("--version", [initdb, "--version"], self.base_env),
-                                 ("init, data dir with a space", [initdb, "-D", str(tmp / "d 1"), "-U", "x", "--pwfile", str(tmp / "pw"), "-A", "scram-sha-256", "--no-instructions"], self.base_env),
-                                 ("init, PATH + jre", [initdb, "-D", str(tmp / "d2"), "-U", "x", "--pwfile", str(tmp / "pw"), "-A", "scram-sha-256", "--no-instructions"], jre_path)):
-            rc, out = self.run(argv, env=env, timeout=300)
-            lines.append(f"initdb {label}: exit {rc} {tail(out, 6)}")
-        # Where the binaries live: in the profile with a space (the install), outside it with and without a space.
-        for where in (r"C:\pgdiag", r"C:\pg diag", str(self.install.parent / "pgdiag")):
-            dst = pathlib.Path(where) / "pgsql"
-            shutil.rmtree(dst.parent, ignore_errors=True)
-            shutil.copytree(self.install / "runtime" / "pgsql", dst)
-            rc, out = self.run([str(dst / "bin" / "initdb.exe"), "-D", str(tmp / ("x" + str(abs(hash(where))))), "-U", "x", "--pwfile", str(tmp / "pw"),
-                                "-A", "scram-sha-256", "--no-instructions"], timeout=300)
-            lines.append(f"initdb from {dst}: exit {rc} {tail(out, 3)}")
-            shutil.rmtree(dst.parent, ignore_errors=True)
-        for f in (self.install, self.install / "runtime" / "pgsql" / "bin" / "initdb.exe", self.install / "runtime" / "pgsql" / "bin" / "libintl-9.dll"):
-            lines.append(self.run(["icacls", str(f)])[1].strip())
-        shutil.rmtree(tmp, ignore_errors=True)
         return "\n".join(lines)
 
     def setup(self):
@@ -317,8 +296,9 @@ class Smoke:
             if want not in out:
                 raise AssertionError(f"setup output lacks {want!r}:\n{tail(out)}")
         self.read_env()
-        acl = self.run(["icacls", str(self.install / "config" / "toolkit.env")])[1]
-        return "config, secrets, certificate, database; toolkit.env ACL: " + " ".join(acl.split()[1:6])
+        acl = " ".join(self.run(["icacls", str(self.install / "config" / "toolkit.env")])[1].split()[1:-6])
+        root = " ".join(self.run(["icacls", str(self.install)])[1].split()[3:-6])
+        return f"config, secrets, certificate, database; toolkit.env ACL: {acl}; install folder ACL: {root}"
 
     def start(self):
         rc, out = self.run([], timeout=600, script=str(self.install / "start.cmd"))
