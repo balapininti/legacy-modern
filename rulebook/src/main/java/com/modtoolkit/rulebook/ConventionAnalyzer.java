@@ -1,5 +1,6 @@
 package com.modtoolkit.rulebook;
 
+import com.modtoolkit.core.PathKeys;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -119,7 +120,7 @@ public final class ConventionAnalyzer {
             for (Map.Entry<Path, String> e : texts.entrySet()) {
                 String[] lines = e.getValue().split("\n", -1);
                 for (int i = 0; i < lines.length && evidence.size() < 5; i++) {
-                    if (p.matcher(lines[i]).find()) evidence.add(repo.relativize(e.getKey()) + ":" + (i + 1) + ": " + lines[i].strip());
+                    if (p.matcher(lines[i]).find()) evidence.add(PathKeys.key(repo, e.getKey()) + ":" + (i + 1) + ": " + lines[i].strip());
                 }
             }
             if (evidence.isEmpty()) continue;
@@ -148,10 +149,8 @@ public final class ConventionAnalyzer {
     private static List<Path> files(Path repo, String ext) throws IOException {
         if (!Files.isDirectory(repo)) return List.of();
         try (Stream<Path> s = Files.walk(repo)) {
-            return s.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(ext) && !p.toString().endsWith(".spec.ts") && !p.toString().endsWith(".d.ts")).filter(p -> {
-                for (Path part : repo.relativize(p)) if (SKIP.contains(part.toString())) return false;
-                return true;
-            }).sorted().toList();
+            return s.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(ext) && !p.toString().endsWith(".spec.ts") && !p.toString().endsWith(".d.ts"))
+                    .filter(p -> !PathKeys.under(repo, p, SKIP)).sorted().toList();
         }
     }
 }

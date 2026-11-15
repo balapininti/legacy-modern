@@ -3,6 +3,7 @@ package com.modtoolkit.discovery.modern;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.modtoolkit.discovery.NodeStore;
+import com.modtoolkit.core.PathKeys;
 import com.modtoolkit.discovery.NodeStore.Key;
 import com.modtoolkit.parsers.normalize.Normalizer;
 import java.io.IOException;
@@ -53,7 +54,7 @@ public class TargetIndexer {
         int changed = 0;
         int units = 0;
         for (Path f : files) {
-            String rel = repoRoot.relativize(f).toString();
+            String rel = PathKeys.key(repoRoot, f);
             seen.add(rel);
             byte[] bytes = Files.readAllBytes(f);
             String hash = Normalizer.sha256(bytes);
@@ -73,8 +74,7 @@ public class TargetIndexer {
     }
 
     private static boolean skipped(Path root, Path p) {
-        for (Path part : root.relativize(p)) if (SKIP_DIRS.contains(part.toString())) return true;
-        return false;
+        return PathKeys.under(root, p, SKIP_DIRS);
     }
 
     private int replace(String repo, String rel, List<ModernUnit> units, String source) throws Exception {
