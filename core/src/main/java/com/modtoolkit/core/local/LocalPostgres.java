@@ -301,7 +301,9 @@ public final class LocalPostgres {
             // nothing answers; now make sure we could bind it ourselves
         }
         try (ServerSocket ss = new ServerSocket()) {
-            ss.setReuseAddress(false);
+            // As postgres binds: SO_REUSEADDR on Unix, so connections of the last run still in TIME_WAIT (closed by
+            // the server, as a stop does) do not count as "in use"; Windows keeps its exclusive default.
+            ss.setReuseAddress(!WINDOWS);
             ss.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
             return true;
         } catch (IOException e) {
