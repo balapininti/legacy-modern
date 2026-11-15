@@ -83,7 +83,7 @@ public class SetupCommand implements Callable<Integer> {
             Files.deleteIfExists(home.pidFile());
         }
         Path pgHome = home.pgHome(real);
-        LocalPostgres pg = new LocalPostgres(pgHome, home.pgData(), pgPort, home.pgLog());
+        LocalPostgres pg = Launcher.postgres(home, pgHome, pgPort);
         if (!Files.isRegularFile(pg.binary("initdb")) || !Files.isRegularFile(pg.binary("pg_ctl"))) {
             System.err.println("toolkit setup: PostgreSQL not found in " + pgHome + " (expected bin/initdb and bin/pg_ctl)");
             return 1;
@@ -107,6 +107,7 @@ public class SetupCommand implements Callable<Integer> {
 
         keystore(home, host, env.get("TOOLKIT_TLS_PASSWORD"));
         System.out.println("made a self-signed certificate for " + host + ", localhost and 127.0.0.1: " + home.keystore());
+        System.out.println("the certificate for clients to trust (no key): " + home.certificate());
 
         pg.init(Launcher.PG_SUPERUSER, env.get(Launcher.PG_SUPERUSER_PASSWORD));
         try {
@@ -150,13 +151,21 @@ public class SetupCommand implements Callable<Integer> {
                 "-validity", "825", "-dname", "CN=" + host, "-ext", "SAN=" + san, "-storetype", "PKCS12", "-keystore", home.keystore().toString(),
                 // The password travels in the environment, not on a command line other users can list.
                 "-storepass:env", "TOOLKIT_TLS_PASSWORD", "-keypass:env", "TOOLKIT_TLS_PASSWORD", "-noprompt"));
+        keytool(cmd, password);
+        EnvFile.restrictToOwner(home.keystore());
+        // The certificate alone (public, PEM): what MCP clients and browsers are told to trust (INSTALL.md).
+        Files.deleteIfExists(home.certificate());
+        keytool(List.of(home.keytool().toString(), "-exportcert", "-rfc", "-alias", "toolkit", "-keystore", home.keystore().toString(),
+                "-storetype", "PKCS12", "-storepass:env", "TOOLKIT_TLS_PASSWORD", "-file", home.certificate().toString()), password);
+    }
+
+    private static void keytool(List<String> cmd, String password) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(cmd).redirectErrorStream(true);
         pb.environment().put("TOOLKIT_TLS_PASSWORD", password);
         Process p = pb.start();
         p.getOutputStream().close();
         String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         if (p.waitFor() != 0) throw new IllegalStateException("keytool failed (exit " + p.exitValue() + "): " + out.strip());
-        EnvFile.restrictToOwner(home.keystore());
     }
 
     /** The toolkit.yaml setup writes: single-quoted YAML scalars (no escapes), paths with {@code /}, which Java accepts on Windows. */

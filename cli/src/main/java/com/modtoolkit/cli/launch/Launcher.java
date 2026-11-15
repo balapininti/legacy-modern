@@ -121,7 +121,17 @@ public final class Launcher {
     }
 
     public static LocalPostgres postgres(Home home, Map<String, String> env) {
-        return new LocalPostgres(home.pgHome(env), home.pgData(), port(env, "TOOLKIT_PG_PORT"), home.pgLog());
+        return postgres(home, home.pgHome(env), port(env, "TOOLKIT_PG_PORT"));
+    }
+
+    /**
+     * The install's database. On Windows the JRE's bin folder goes on the PostgreSQL programs' PATH: they need the
+     * Visual C++ runtime, which the EDB zip leaves out and Temurin ships there (see LocalPostgres.libraryPath).
+     */
+    static LocalPostgres postgres(Home home, Path pgHome, int port) {
+        LocalPostgres pg = new LocalPostgres(pgHome, home.pgData(), port, home.pgLog());
+        if (Home.WINDOWS) pg.libraryPath(home.java().getParent());
+        return pg;
     }
 
     static int port(Map<String, String> env, String name) {

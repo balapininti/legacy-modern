@@ -43,6 +43,7 @@ public final class LocalPostgres {
     private final int port;
     private final Path logFile;
     private final Map<String, String> settings = new LinkedHashMap<>();
+    private final List<Path> libraryPath = new ArrayList<>();
     private String superuser;
     private String password;
 
@@ -74,6 +75,17 @@ public final class LocalPostgres {
             throw new IllegalArgumentException("bad setting name: " + name);
         }
         settings.put(name, value);
+        return this;
+    }
+
+    /**
+     * A folder appended to PATH for every PostgreSQL program this runs, so Windows finds DLLs there that are neither
+     * next to the program nor installed system-wide. The Windows bundle passes the JRE's bin folder: the EDB binaries
+     * need the Visual C++ runtime (VCRUNTIME140.dll, MSVCP140.dll), which Temurin ships there and Windows lacks
+     * unless the Visual C++ Redistributable is installed. A system-wide copy is still found first.
+     */
+    public LocalPostgres libraryPath(Path dir) {
+        libraryPath.add(dir.toAbsolutePath().normalize());
         return this;
     }
 
@@ -111,7 +123,7 @@ public final class LocalPostgres {
         try {
             Files.createDirectories(dataDir.getParent());
             pwfile = secretFile(password);
-            Result r = run(Duration.ofMinutes(5), binary("initdb").toString(), "-D", dataDir.toString(), "-U", superuser,
+            Result r = exec(Duration.ofMinutes(5), binary("initdb").toString(), "-D", dataDir.toString(), "-U", superuser,
                     "--auth=scram-sha-256", "--pwfile=" + pwfile, "-E", "UTF8", "--no-locale", "--no-instructions");
             if (r.exit != 0) {
                 throw new IllegalStateException("initdb failed (exit " + r.exit + ") for " + dataDir + ":\n" + r.output);
@@ -139,7 +151,7 @@ public final class LocalPostgres {
         if (!initialized() || !Files.exists(dataDir.resolve("postmaster.pid")) || stalePidFile()) {
             return false;
         }
-        return run(Duration.ofSeconds(30), binary("pg_ctl").toString(), "-D", dataDir.toString(), "status").exit == 0;
+        return exec(Duration.ofSeconds(30), binary("pg_ctl").toString(), "-D", dataDir.toString(), "status").exit == 0;
     }
 
     /** The postmaster's process id from postmaster.pid, when the file is there. */
@@ -183,7 +195,7 @@ public final class LocalPostgres {
         while (true) {
             long secs = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(deadline - System.nanoTime()));
             long logStart = logSize();
-            Result r = run(Duration.ofSeconds(secs + 30), binary("pg_ctl").toString(), "-D", dataDir.toString(),
+            Result r = exec(Duration.ofSeconds(secs + 30), binary("pg_ctl").toString(), "-D", dataDir.toString(),
                     "-l", logFile.toString(), "-w", "-t", Long.toString(secs), "start");
             if (r.exit == 0) {
                 return;
@@ -212,7 +224,7 @@ public final class LocalPostgres {
         if (!running()) {
             return;
         }
-        Result r = run(Duration.ofMinutes(2), binary("pg_ctl").toString(), "-D", dataDir.toString(), "stop", "-m", "fast", "-w", "-t", "60");
+        Result r = exec(Duration.ofMinutes(2), binary("pg_ctl").toString(), "-D", dataDir.toString(), "stop", "-m", "fast", "-w", "-t", "60");
         if (r.exit != 0 && running()) {
             throw new IllegalStateException("PostgreSQL did not stop (pg_ctl exit " + r.exit + "):\n" + r.output);
         }
@@ -344,9 +356,32 @@ public final class LocalPostgres {
 
     record Result(int exit, String output) {}
 
+    private Result exec(Duration timeout, String... command) {
+        Result r = run(timeout, libraryPath, command);
+        return r.exit == STATUS_DLL_NOT_FOUND
+                ? new Result(r.exit, r.output + (r.output.isEmpty() ? "" : "\n") + DLL_HINT)
+                : r;
+    }
+
+    /** Windows' exit status for a program whose DLL could not be found (0xC0000135). */
+    static final int STATUS_DLL_NOT_FOUND = 0xC0000135;
+    static final String DLL_HINT = "Windows could not find a DLL the PostgreSQL programs need (exit status 0xC0000135). Usually that is"
+            + " the Microsoft Visual C++ runtime: keep the install's runtime\\jre folder complete, or install the Microsoft Visual C++"
+            + " 2015-2022 Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe (needs an administrator).";
+
     /** Runs a program with an argument list (no shell), draining its merged output on a separate thread. */
-    static Result run(Duration timeout, String... command) {
+    static Result run(Duration timeout, List<Path> libraryPath, String... command) {
         ProcessBuilder pb = new ProcessBuilder(new ArrayList<>(List.of(command))).redirectErrorStream(true);
+        if (!libraryPath.isEmpty()) {
+            // Windows names it "Path", and ProcessBuilder's map is case-sensitive: reuse whatever key is there.
+            String key = pb.environment().keySet().stream().filter(k -> k.equalsIgnoreCase("PATH")).findFirst().orElse("PATH");
+            StringBuilder path = new StringBuilder(Objects.requireNonNullElse(pb.environment().get(key), ""));
+            for (Path d : libraryPath) {
+                if (path.length() > 0) path.append(java.io.File.pathSeparatorChar);
+                path.append(d);
+            }
+            pb.environment().put(key, path.toString());
+        }
         // English tool messages; the server's own log language comes from lc_messages ('C' after initdb --no-locale).
         pb.environment().put("LC_MESSAGES", "C");
         pb.environment().remove("PGDATA");

@@ -52,6 +52,11 @@ public record Home(Path root) {
         return data().resolve("tls").resolve("toolkit.p12");
     }
 
+    /** The keystore's certificate as PEM, for clients to trust; no private key. */
+    public Path certificate() {
+        return data().resolve("tls").resolve("toolkit.crt");
+    }
+
     public Path logs() {
         return data().resolve("logs");
     }

@@ -92,7 +92,12 @@ class LauncherIT {
         pgHome = TestPostgres.pgHome();
         home = Files.createTempDirectory("launcher").resolve("Tool Kit");
         Files.createDirectories(home.resolve("lib"));
-        Files.createSymbolicLink(home.resolve("lib/toolkit.jar"), JAR);
+        try {
+            Files.createSymbolicLink(home.resolve("lib/toolkit.jar"), JAR);
+        } catch (IOException | UnsupportedOperationException noSymlinks) {
+            // Windows without the symlink privilege (not an administrator, no developer mode).
+            Files.copy(JAR, home.resolve("lib/toolkit.jar"));
+        }
         source = Files.createTempDirectory("launcher").resolve("main frame src");
         Files.createDirectories(source.resolve("app/cbl"));
         Files.writeString(source.resolve("app/cbl/HELLO.cbl"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. HELLO.\n");
@@ -124,9 +129,12 @@ class LauncherIT {
         assertThat(env).containsEntry("TOOLKIT_ADMIN_PASSWORD", adminPassword).containsEntry("TOOLKIT_HTTPS_PORT", Integer.toString(https))
                 .containsEntry("TOOLKIT_PG_PORT", Integer.toString(pgPort)).containsEntry("TOOLKIT_DB_USER", "toolkit")
                 .containsKeys("TOOLKIT_DB_PASSWORD", "TOOLKIT_TLS_PASSWORD", "TOOLKIT_PG_SUPERUSER_PASSWORD", "TOOLKIT_DB_URL");
-        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(home.resolve("config/toolkit.env")))).isEqualTo("rw-------");
+        if (!Home.WINDOWS) {
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(home.resolve("config/toolkit.env")))).isEqualTo("rw-------");
+        }
         assertThat(ToolkitConfig.load(home.resolve("config/toolkit.yaml")).source().root()).isEqualTo(source.toString());
         assertThat(home.resolve("data/tls/toolkit.p12")).isRegularFile();
+        assertThat(Files.readString(home.resolve("data/tls/toolkit.crt"))).startsWith("-----BEGIN CERTIFICATE-----").doesNotContain("PRIVATE KEY");
         assertThat(home.resolve("data/pg/PG_VERSION")).isRegularFile();
         assertThat(portFree(pgPort)).as("setup leaves the database stopped").isTrue();
 

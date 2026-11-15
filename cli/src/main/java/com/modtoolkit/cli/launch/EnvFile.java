@@ -30,8 +30,8 @@ import java.util.regex.Pattern;
  * span lines. Blank lines and lines whose first non-blank character is {@code #} are ignored. A later line for the
  * same NAME wins. UTF-8; a leading byte-order mark and CRLF line ends (Notepad) are accepted.
  *
- * <p>Writing restricts the file to the current user: POSIX mode 600, or on Windows an ACL with a single entry giving
- * the owner full control, with inherited entries removed.
+ * <p>Writing restricts the file to the current user: POSIX mode 600, or on Windows an ACL giving the owner full
+ * control and LocalSystem read (for service mode), with inherited entries removed.
  */
 public final class EnvFile {
     static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
@@ -117,7 +117,11 @@ public final class EnvFile {
         }
     }
 
-    /** POSIX 600; on Windows the owner alone with full control and no inherited entries. */
+    /**
+     * POSIX 600; on Windows the owner with full control and no inherited entries, plus read for the operating system
+     * itself (LocalSystem, S-1-5-18), which runs the optional Windows service (service\toolkit.xml). LocalSystem can
+     * read every file anyway; the entry only saves it from needing a privilege to do so.
+     */
     public static void restrictToOwner(Path file) throws IOException {
         if (posix()) {
             Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"));
@@ -140,7 +144,8 @@ public final class EnvFile {
 
     private static void protectWithIcacls(Path file) {
         try {
-            Process p = new ProcessBuilder("icacls", file.toString(), "/inheritance:r").redirectErrorStream(true)
+            // By SID: account names are translated on non-English Windows.
+            Process p = new ProcessBuilder("icacls", file.toString(), "/inheritance:r", "/grant", "*S-1-5-18:(R)").redirectErrorStream(true)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
             p.getOutputStream().close();
             p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS);
