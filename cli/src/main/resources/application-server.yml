@@ -1,0 +1,43 @@
+# toolkit serve: the web UI, the REST API and the MCP endpoint in one process on one HTTPS port.
+# TLS comes from ServerTls (TOOLKIT_TLS_KEYSTORE/TOOLKIT_TLS_PASSWORD, or TOOLKIT_TLS_CERT/TOOLKIT_TLS_KEY).
+spring:
+  main:
+    web-application-type: servlet
+  mvc:
+    async:
+      # MCP results stream; nothing in between may cut a long tool call short.
+      request-timeout: 1h
+  web:
+    resources:
+      # The UI comes from toolkit.ui.dir (SpaFallback), never from the classpath.
+      add-mappings: false
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: mainframe-modernization-toolkit
+        version: 0.1.0
+        protocol: STREAMABLE
+        type: SYNC
+        stdio: false
+server:
+  port: ${TOOLKIT_HTTPS_PORT:8443}
+  http2:
+    enabled: true
+  tomcat:
+    # A body over toolkit.http.max-body-size gets a 413; reading the rest of it lets the client see that answer.
+    max-swallow-size: 16MB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+toolkit:
+  oidc:
+    issuer: ${TOOLKIT_OIDC_ISSUER:}
+  ui:
+    enabled: true
+    # Unset: <TOOLKIT_HOME>/ui when it holds an index.html, else no UI.
+    dir: ${TOOLKIT_UI_DIR:}
+  http:
+    max-body-size: 2MB

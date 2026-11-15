@@ -21,7 +21,7 @@ services:
     image: modtoolkit/toolkit:${TOOLKIT_VERSION:-0.1.0-SNAPSHOT}
     pull_policy: ${TOOLKIT_PULL_POLICY:-missing}
     restart: unless-stopped
-    command: ["serve"]
+    command: ["serve", "--plain-http"]
     depends_on: {postgres: {condition: service_healthy}}
     environment: &toolkit-env
       TOOLKIT_DB_URL: jdbc:postgresql://postgres:5432/toolkit

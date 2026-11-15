@@ -110,7 +110,7 @@ class McpContractIT {
         try (ServerSocket s = new ServerSocket(0)) {
             apiPort = s.getLocalPort();
         }
-        ProcessBuilder ab = new ProcessBuilder(java(), "-jar", JAR.toString(), "serve").redirectErrorStream(true).redirectOutput(new File(REPO.resolve("cli/target/api-it.log").toString()));
+        ProcessBuilder ab = new ProcessBuilder(java(), "-jar", JAR.toString(), "serve", "--plain-http").redirectErrorStream(true).redirectOutput(new File(REPO.resolve("cli/target/api-it.log").toString()));
         ab.environment().putAll(env());
         ab.environment().put("TOOLKIT_API_PORT", String.valueOf(apiPort));
         api = ab.start();

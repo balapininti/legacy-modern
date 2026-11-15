@@ -104,7 +104,7 @@ SQL
   echo "[stack] serve"
   api_port="$(free_port)"
   TOOLKIT_ADMIN_PASSWORD="$ADMIN_PASSWORD" TOOLKIT_API_PORT="$api_port" TOOLKIT_CONFIG="$yaml" \
-    nohup java -jar "$JAR" serve > "$STATE/api.log" 2>&1 &
+    nohup java -jar "$JAR" serve --plain-http > "$STATE/api.log" 2>&1 &
   echo $! > "$STATE/api.pid"
   for _ in $(seq 1 120); do
     curl -fs "http://127.0.0.1:$api_port/actuator/health" >/dev/null 2>&1 && break
