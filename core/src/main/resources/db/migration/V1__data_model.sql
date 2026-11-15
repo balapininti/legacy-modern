@@ -1,5 +1,4 @@
 -- Spec "Data model". All line numbers are 1-based on normalized text, with the original beside them.
-CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE member (
@@ -113,11 +112,12 @@ CREATE FUNCTION cobol_tsquery(t text) RETURNS tsquery LANGUAGE sql IMMUTABLE PAR
   SELECT coalesce(string_agg(quote_literal(tok), ' | '), '')::tsquery FROM cobol_tokens(t)
 $$;
 
+-- chunk.embedding (pgvector) is added by V5 only where the server has the extension.
 CREATE TABLE chunk (
   id bigserial PRIMARY KEY, member_id bigint REFERENCES member ON DELETE CASCADE, artifact_id bigint REFERENCES knowledge_artifact ON DELETE CASCADE,
   modern_unit_id bigint REFERENCES modern_unit ON DELETE CASCADE,
   kind text NOT NULL, line_start int, line_end int, text text NOT NULL,
-  tsv tsvector, embedding vector, embedding_model text, metadata jsonb NOT NULL DEFAULT '{}');
+  tsv tsvector, embedding_model text, metadata jsonb NOT NULL DEFAULT '{}');
 CREATE INDEX chunk_tsv_idx ON chunk USING gin (tsv);
 CREATE INDEX chunk_text_trgm_idx ON chunk USING gin (text gin_trgm_ops);
 CREATE INDEX chunk_member_idx ON chunk (member_id);

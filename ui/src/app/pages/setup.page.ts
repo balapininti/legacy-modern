@@ -38,7 +38,7 @@ import { StateComponent } from '../core/state.component';
                     @for (x of d.checks; track $index) {
                       <tr [attr.data-check]="x.check">
                         <td>{{ x.check }}</td>
-                        <td><span class="badge" [class.good]="x.status === 'PASS'" [class.bad]="x.status === 'FAIL'">{{ x.status }}</span></td>
+                        <td><span class="badge" [class.good]="x.status === 'PASS'" [class.bad]="x.status === 'FAIL'" [class.warn]="x.status === 'WARN'">{{ x.status }}</span></td>
                         <td class="mono">{{ x.detail }}</td>
                       </tr>
                     }

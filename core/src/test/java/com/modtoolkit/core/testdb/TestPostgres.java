@@ -32,6 +32,7 @@ public final class TestPostgres {
 
     private static final AtomicInteger SEQ = new AtomicInteger();
     private static volatile TestPostgres instance;
+    private static volatile TestPostgres withoutVector;
 
     private final LocalPostgres server;
     private final String password;
@@ -55,12 +56,45 @@ public final class TestPostgres {
         return t;
     }
 
+    /**
+     * A second server for the JVM, run from a mirror of the PostgreSQL home whose extension and library folders lack
+     * pgvector, so {@code pg_available_extensions} has no {@code vector}: a client's own PostgreSQL without it.
+     */
+    public static TestPostgres withoutVector() {
+        TestPostgres t = withoutVector;
+        if (t == null) {
+            synchronized (TestPostgres.class) {
+                t = withoutVector;
+                if (t == null) {
+                    try {
+                        Path mirror = Files.createTempDirectory(PREFIX + "home-");
+                        // An owner lets sweepOrphans delete the mirror if this JVM is killed.
+                        Files.writeString(mirror.resolve("owner.pid"), Long.toString(ProcessHandle.current().pid()), StandardCharsets.UTF_8);
+                        Runtime.getRuntime().addShutdownHook(new Thread(() -> deleteTree(mirror), "test-postgres-home-delete"));
+                        withoutVector = t = start(homeWithoutVector(pgHome(), mirror));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException("could not mirror the PostgreSQL home without pgvector", e);
+                    }
+                }
+            }
+        }
+        return t;
+    }
+
     /** A new, uniquely named, empty database owned by the superuser (as the Testcontainers image gave us). */
     public static Database newDatabase() {
-        TestPostgres t = get();
+        return get().database();
+    }
+
+    /** {@link #newDatabase()} on the server without pgvector. */
+    public static Database newDatabaseWithoutVector() {
+        return withoutVector().database();
+    }
+
+    private Database database() {
         String name = "t" + ProcessHandle.current().pid() + "_" + SEQ.incrementAndGet();
-        t.server.createDatabase(name);
-        return new Database(t.server.jdbcUrl(name), SUPERUSER, t.password);
+        server.createDatabase(name);
+        return new Database(server.jdbcUrl(name), SUPERUSER, password);
     }
 
     public LocalPostgres server() {
@@ -82,7 +116,10 @@ public final class TestPostgres {
     }
 
     private static TestPostgres start() {
-        Path home = pgHome();
+        return start(pgHome());
+    }
+
+    private static TestPostgres start(Path home) {
         sweepOrphans(home);
         try {
             Path root = Files.createTempDirectory(PREFIX);
@@ -180,6 +217,102 @@ public final class TestPostgres {
             Thread.currentThread().interrupt();
             return null;
         }
+    }
+
+    /**
+     * Mirrors {@code home} under {@code into} with every {@code vector*} file left out of the extension and library
+     * folders. PostgreSQL finds its share and library folders relative to its own binary, by the same relative path as at
+     * build time, so the binaries are copied (a symlink would resolve back to the original) and the folders as reported
+     * by {@code pg_config} are recreated at the same place relative to them, their contents linked (or copied where links
+     * are not allowed). Returns the mirror's home, the parent of its {@code bin}.
+     */
+    static Path homeWithoutVector(Path home, Path into) throws IOException {
+        Path pgConfig = new LocalPostgres(home, home.resolve("unused"), 1).binary("pg_config");
+        if (!Files.isRegularFile(pgConfig)) {
+            throw new IllegalStateException(pgConfig + " not found; it is needed to start a PostgreSQL without pgvector. " + INSTALL_HINT);
+        }
+        List<Path> dirs = pgConfig(pgConfig, "--bindir", "--sharedir", "--pkglibdir");
+        Path bin = dirs.get(0), share = dirs.get(1), pkglib = dirs.get(2);
+        Path common = bin;
+        while (!share.startsWith(common) || !pkglib.startsWith(common)) {
+            common = common.getParent();
+        }
+        Path newBin = into.resolve(common.relativize(bin).toString());
+        Files.createDirectories(newBin);
+        try (Stream<Path> s = Files.list(bin)) {
+            for (Path f : s.toList()) {
+                if (Files.isRegularFile(f)) {
+                    Files.copy(f, newBin.resolve(f.getFileName().toString()), java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
+                }
+            }
+        }
+        for (Path dir : List.of(share, pkglib)) {
+            Path target = into.resolve(common.relativize(dir).toString());
+            Files.createDirectories(target);
+            try (Stream<Path> s = Files.list(dir)) {
+                for (Path f : s.toList()) {
+                    String name = f.getFileName().toString();
+                    if (name.startsWith("vector")) {
+                        continue;
+                    }
+                    if (dir.equals(share) && name.equals("extension")) {
+                        Path ext = Files.createDirectories(target.resolve(name));
+                        try (Stream<Path> e = Files.list(f)) {
+                            for (Path x : e.toList()) {
+                                if (!x.getFileName().toString().startsWith("vector")) {
+                                    linkOrCopy(x, ext.resolve(x.getFileName().toString()));
+                                }
+                            }
+                        }
+                    } else if (!Files.exists(target.resolve(name), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                        linkOrCopy(f, target.resolve(name));
+                    }
+                }
+            }
+        }
+        return newBin.getParent();
+    }
+
+    private static void linkOrCopy(Path from, Path to) throws IOException {
+        try {
+            Files.createSymbolicLink(to, from);
+        } catch (UnsupportedOperationException | IOException e) {
+            if (Files.isDirectory(from)) {
+                try (Stream<Path> s = Files.walk(from)) {
+                    for (Path p : s.toList()) {
+                        Path dest = to.resolve(from.relativize(p).toString());
+                        if (Files.isDirectory(p)) {
+                            Files.createDirectories(dest);
+                        } else {
+                            Files.copy(p, dest);
+                        }
+                    }
+                }
+            } else {
+                Files.copy(from, to);
+            }
+        }
+    }
+
+    private static List<Path> pgConfig(Path pgConfig, String... flags) throws IOException {
+        List<String> cmd = new java.util.ArrayList<>(List.of(pgConfig.toString()));
+        cmd.addAll(List.of(flags));
+        Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        p.getOutputStream().close();
+        String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+        try {
+            if (p.waitFor() != 0) {
+                throw new IllegalStateException(pgConfig + " failed: " + out);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+        List<Path> dirs = out.lines().map(String::strip).filter(l -> !l.isEmpty()).map(Path::of).toList();
+        if (dirs.size() != flags.length) {
+            throw new IllegalStateException(pgConfig + " printed " + out);
+        }
+        return dirs;
     }
 
     /** A port nobody listens on right now, on 127.0.0.1. */

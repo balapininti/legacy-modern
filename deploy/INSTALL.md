@@ -48,7 +48,7 @@ docker compose up -d
 ./toolkit doctor -c /config/toolkit.yaml
 ```
 
-Doctor prints PASS, FAIL or SKIP for source, database, LLM, z/OS and identity provider. A FAIL says what to fix. SKIP is fine for what you have not configured yet: discovery and MCP need no LLM.
+Doctor prints PASS, WARN, FAIL or SKIP for source, database, pgvector, LLM, z/OS and identity provider. A FAIL says what to fix. SKIP is fine for what you have not configured yet: discovery and MCP need no LLM. WARN on `vector` means the PostgreSQL server has no pgvector: everything works, search is lexical-only; install pgvector and run `toolkit reindex` to turn vector search on.
 
 ## 5. Discover
 
