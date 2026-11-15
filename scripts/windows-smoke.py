@@ -240,7 +240,9 @@ class Smoke:
     def unzip(self):
         if self.install.exists():
             shutil.rmtree(self.install)
-        tmp = pathlib.Path(tempfile.mkdtemp(prefix="unzip-", dir=str(self.install.parent)))
+        # A plain folder, as Explorer's Extract All makes, inheriting the profile's ACL (mkdtemp's is owner-only).
+        tmp = self.install.parent / f"unzip-{os.getpid()}"
+        tmp.mkdir()
         with zipfile.ZipFile(self.a.zip) as z:
             z.extractall(tmp)
         (tmp / "toolkit").rename(self.install)

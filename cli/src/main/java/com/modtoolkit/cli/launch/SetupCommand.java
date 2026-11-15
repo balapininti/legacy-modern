@@ -219,9 +219,10 @@ public class SetupCommand implements Callable<Integer> {
      * Gives the current user, by SID, modify rights on the install folder, inherited by everything in it. PostgreSQL
      * refuses to run with administrator rights: started by an administrator, initdb, pg_ctl and postgres re-run
      * themselves with a token in which the Administrators group no longer grants anything. A folder whose ACL lets
-     * the user in only as an administrator (files an elevated process unpacked under a profile that grants just
-     * SYSTEM, Administrators and OWNER RIGHTS, as on the GitHub runner) then cannot even load its own DLLs: initdb
-     * fails with 0xC0000135. Best effort: a standard user who unpacked the zip already has these rights.
+     * the user in only as an administrator (SYSTEM, Administrators and OWNER RIGHTS, with Administrators as the
+     * owner: what an elevated process gets from Python's mkdtemp, for one, which is how the Windows smoke test first
+     * met it) then cannot even load its own DLLs: initdb fails with 0xC0000135. Best effort: a user who unpacked the
+     * zip into a folder of their own already has these rights.
      */
     static void grantCurrentUser(Path root) {
         try {
