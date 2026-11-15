@@ -1,5 +1,6 @@
 package com.modtoolkit.retrieval;
 
+import com.modtoolkit.core.VectorSupport;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,10 @@ public class EmbeddingIndexer {
     }
 
     public Stats embedPending(Embedder e) {
+        if (!VectorSupport.available(jdbc)) {
+            log.info("pgvector is not available, so no embeddings are made and search stays lexical-only; to turn it on, {}", VectorSupport.HOW_TO_ENABLE);
+            return new Stats(0, 0);
+        }
         int done = 0;
         for (String priority : List.of("c.kind IN ('summary','rule','dictionary','job','map')", "c.kind IN ('code','modern') AND coalesce(c.metadata->>'unit','') <> 'copybook'")) {
             while (true) {
@@ -59,13 +64,14 @@ public class EmbeddingIndexer {
     /** A plain vector HNSW stops at 2000 dimensions, so the index is on a halfvec cast, which goes to 4000. */
     public void ensureIndex(int dim) {
         if (dim < 1 || dim > 4000) throw new IllegalArgumentException("embedding dimension must be 1 to 4000");
+        if (!VectorSupport.available(jdbc)) return;
         // Rows from other dimensions would fail the cast, which only happens mid-reindex; they are filtered in the index.
         jdbc.execute("CREATE INDEX IF NOT EXISTS chunk_embedding_hnsw_" + dim + " ON chunk USING hnsw ((embedding::halfvec(" + dim + ")) halfvec_cosine_ops) WHERE vector_dims(embedding) = " + dim);
     }
 
     /** Forces every vector to be rebuilt. */
     public void clear() {
-        jdbc.update("UPDATE chunk SET embedding = NULL, embedding_model = NULL");
+        jdbc.update(VectorSupport.available(jdbc) ? "UPDATE chunk SET embedding = NULL, embedding_model = NULL" : "UPDATE chunk SET embedding_model = NULL");
     }
 
     static String literal(float[] v) {

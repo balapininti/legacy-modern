@@ -1,5 +1,6 @@
 package com.modtoolkit.core.config;
 
+import com.modtoolkit.core.VectorSupport;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.file.Files;
@@ -14,7 +15,8 @@ import java.util.function.Function;
 
 /** Live checks of every config block. Nothing is sent to an endpoint beyond a reachability probe. */
 public final class Doctor {
-    public enum Status { PASS, FAIL, SKIP }
+    /** WARN works but with less: it does not fail doctor. */
+    public enum Status { PASS, WARN, FAIL, SKIP }
 
     public record CheckResult(String check, Status status, String detail) {}
 
@@ -34,7 +36,7 @@ public final class Doctor {
             out.add(new CheckResult("config", Status.PASS, "all blocks valid"));
         }
         out.add(source(c));
-        out.add(database());
+        out.addAll(database());
         out.add(llm(c));
         out.add(zos(c));
         out.add(identityProvider(c));
@@ -59,22 +61,39 @@ public final class Doctor {
         return new CheckResult("source", Status.PASS, root.toString());
     }
 
-    private CheckResult database() {
+    /** The connection, then pgvector, which is optional: without it search is lexical-only. */
+    private List<CheckResult> database() {
         String url = env.apply("TOOLKIT_DB_URL");
         if (url == null || url.isBlank()) {
-            return new CheckResult("database", Status.FAIL, "TOOLKIT_DB_URL is not set");
+            return List.of(new CheckResult("database", Status.FAIL, "TOOLKIT_DB_URL is not set"),
+                    new CheckResult("vector", Status.SKIP, "no database to check"));
         }
-        try (Connection con = DriverManager.getConnection(url, env.apply("TOOLKIT_DB_USER"), env.apply("TOOLKIT_DB_PASSWORD"));
-                Statement st = con.createStatement();
-                ResultSet rs = st.executeQuery("SELECT count(*) FROM pg_available_extensions WHERE name = 'vector'")) {
-            rs.next();
-            if (rs.getInt(1) == 0) {
-                return new CheckResult("database", Status.FAIL, "connected, but the pgvector extension is not available");
-            }
-            return new CheckResult("database", Status.PASS, con.getMetaData().getDatabaseProductVersion());
+        try (Connection con = DriverManager.getConnection(url, env.apply("TOOLKIT_DB_USER"), env.apply("TOOLKIT_DB_PASSWORD"))) {
+            CheckResult db = new CheckResult("database", Status.PASS, con.getMetaData().getDatabaseProductVersion());
+            return List.of(db, vector(con));
         } catch (Exception e) {
-            return new CheckResult("database", Status.FAIL, e.getMessage());
+            return List.of(new CheckResult("database", Status.FAIL, e.getMessage()), new CheckResult("vector", Status.SKIP, "no database to check"));
         }
+    }
+
+    static CheckResult vector(Connection con) throws java.sql.SQLException {
+        boolean migrated;
+        try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery("SELECT to_regclass('chunk') IS NOT NULL")) {
+            rs.next();
+            migrated = rs.getBoolean(1);
+        }
+        if (migrated && VectorSupport.available(con)) {
+            return new CheckResult("vector", Status.PASS, "pgvector enabled; search is hybrid when an embedding model is configured");
+        }
+        if (!VectorSupport.installable(con)) {
+            return new CheckResult("vector", Status.WARN, "pgvector is not installed on this PostgreSQL, so vector search is off and search is lexical-only. To turn it on, "
+                    + VectorSupport.HOW_TO_ENABLE);
+        }
+        if (!migrated) {
+            return new CheckResult("vector", Status.PASS, "pgvector available; the first start enables it");
+        }
+        return new CheckResult("vector", Status.WARN, "pgvector is installed but this database was set up without it, so vector search is off and search is lexical-only."
+                + " To turn it on, run `toolkit reindex`");
     }
 
     private CheckResult llm(ToolkitConfig c) {

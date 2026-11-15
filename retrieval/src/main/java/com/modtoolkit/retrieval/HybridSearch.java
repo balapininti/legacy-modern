@@ -1,5 +1,6 @@
 package com.modtoolkit.retrieval;
 
+import com.modtoolkit.core.VectorSupport;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Reciprocal rank fusion of lexical and semantic hits, a boost for reviewed artifacts, rejected ones out, and one hit
- * per place in the source. Without an embedding endpoint it is exactly lexical search, and says so.
+ * per place in the source. Without an embedding endpoint or without pgvector it is exactly lexical search, and says so.
  */
 @Service
 public class HybridSearch {
@@ -38,7 +39,9 @@ public class HybridSearch {
         List<SearchHit> lex = lexical.search(query, kinds, POOL);
         List<SearchHit> sem = List.of();
         String mode = "lexical";
-        if (embedder != null && hasVectors(embedder.model())) {
+        if (embedder != null && !VectorSupport.available(jdbc)) {
+            mode = "lexical (pgvector not installed)";
+        } else if (embedder != null && hasVectors(embedder.model())) {
             try {
                 sem = semantic(embedder.embed(List.of(embedder.asQuery(query))).get(0), embedder, kinds);
                 mode = "hybrid";

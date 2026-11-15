@@ -61,7 +61,7 @@ export interface AuditRow { ts: string; user: string; action: string; tool: stri
 export interface LlmRun { id: number; model: string; units: number; tokens_in: number; tokens_out: number; cost_usd: number; status: string; started_at: string; ended_at: string | null }
 export interface JobRow { id: number; job_name: string; status: string; exit_code: string; start_time: string; end_time: string | null }
 export interface Jobs { running: string | null; recent: JobRow[] }
-export interface DoctorCheck { check: string; status: 'PASS' | 'FAIL' | 'SKIP'; detail: string }
+export interface DoctorCheck { check: string; status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP'; detail: string }
 export interface DoctorResult { ok: boolean; checks: DoctorCheck[] }
 
 export const ROLES = ['admin', 'developer', 'sme-reviewer'] as const;
