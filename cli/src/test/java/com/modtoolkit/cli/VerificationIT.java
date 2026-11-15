@@ -49,7 +49,7 @@ class VerificationIT {
     private record Mvn(int exit, String output) {}
 
     private static Mvn mvnTest(Path dir) throws Exception {
-        ProcessBuilder b = new ProcessBuilder("mvn", "-B", "-q", "test").directory(dir.toFile()).redirectErrorStream(true);
+        ProcessBuilder b = new ProcessBuilder(System.getProperty("os.name", "").startsWith("Windows") ? "mvn.cmd" : "mvn", "-B", "-q", "test").directory(dir.toFile()).redirectErrorStream(true);
         b.environment().put("JAVA_HOME", System.getProperty("java.home"));
         Process p = b.start();
         String out = new String(p.getInputStream().readAllBytes());

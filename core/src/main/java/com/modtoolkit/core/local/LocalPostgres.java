@@ -179,8 +179,15 @@ public final class LocalPostgres {
         }
         Path pidFile = dataDir.resolve("postmaster.pid");
         try {
-            if (Files.exists(pidFile) && stalePidFile()) {
+            boolean killed = Files.exists(pidFile) && stalePidFile();
+            if (killed) {
                 Files.deleteIfExists(pidFile);
+                // A killed postmaster's children hold its listening socket until they notice and exit (on Windows they
+                // inherit it), so its port stays busy for a moment.
+                long until = System.nanoTime() + Math.min(timeout.toNanos(), Duration.ofSeconds(60).toNanos());
+                while (!portFree(port) && System.nanoTime() < until) {
+                    sleep(500);
+                }
             }
             if (!portFree(port)) {
                 throw new IllegalStateException("port " + port + " on 127.0.0.1 is already in use by another program;"

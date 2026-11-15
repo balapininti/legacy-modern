@@ -80,6 +80,7 @@ public class StartCommand implements Callable<Integer> {
         ProcessBuilder pb = new ProcessBuilder(cmd).directory(home.root().toFile());
         Launcher.replaceEnvironment(pb, Launcher.childEnvironment(env));
         if (foreground) {
+            pb.environment().put(com.modtoolkit.cli.ServeCommand.LAUNCHER_PID, Long.toString(ProcessHandle.current().pid()));
             pb.inheritIO();
         } else {
             // javaw has no console, so closing the window start.cmd ran in does not end the server.

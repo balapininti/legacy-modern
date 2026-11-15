@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.AclEntry;
 import java.nio.file.attribute.AclEntryPermission;
 import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.EnumSet;
@@ -57,15 +58,37 @@ class EnvFileTest {
         EnvFile.write(f, v);
         assertThat(EnvFile.read(f)).isEqualTo(v);
         assertThat(Files.readString(f, StandardCharsets.UTF_8)).startsWith("#").contains("TOOLKIT_HTTPS_PORT=8443\n");
-        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(f))).isEqualTo("rw-------");
+        assertOwnerOnly(f);
         // A rewrite keeps it owner-only.
-        Files.setPosixFilePermissions(f, PosixFilePermissions.fromString("rw-r--r--"));
+        if (!Home.WINDOWS) Files.setPosixFilePermissions(f, PosixFilePermissions.fromString("rw-r--r--"));
         EnvFile.write(f, Map.of("X", "1"));
-        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(f))).isEqualTo("rw-------");
+        assertOwnerOnly(f);
         assertThat(EnvFile.read(f)).containsExactly(Map.entry("X", "1"));
         try (var s = Files.list(f.getParent())) {
             assertThat(s.map(p -> p.getFileName().toString())).as("no temp file left").containsExactly("toolkit.env");
         }
+    }
+
+    /** POSIX 600; on Windows the real ACL: the owner, LocalSystem (service mode) and nobody else, nothing inherited. */
+    static void assertOwnerOnly(Path f) throws Exception {
+        if (!Home.WINDOWS) {
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(f))).isEqualTo("rw-------");
+            return;
+        }
+        AclFileAttributeView view = Files.getFileAttributeView(f, AclFileAttributeView.class);
+        String owner = view.getOwner().getName();
+        List<AclEntry> acl = view.getAcl();
+        assertThat(acl).as("ACL of " + f).allSatisfy(e -> {
+            assertThat(e.type()).isEqualTo(AclEntryType.ALLOW);
+            assertThat(e.principal().getName()).as("principal").satisfiesAnyOf(n -> assertThat(n).isEqualTo(owner), n -> assertThat(n).endsWith("\\SYSTEM"));
+            assertThat(e.flags()).as("inherited or inheritable").isEmpty();
+        });
+        assertThat(acl).anySatisfy(e -> {
+            assertThat(e.principal().getName()).isEqualTo(owner);
+            assertThat(e.permissions()).containsAll(EnumSet.of(AclEntryPermission.READ_DATA, AclEntryPermission.WRITE_DATA));
+        });
+        assertThat(acl).filteredOn(e -> e.principal().getName().endsWith("\\SYSTEM"))
+                .allSatisfy(e -> assertThat(e.permissions()).contains(AclEntryPermission.READ_DATA).doesNotContain(AclEntryPermission.WRITE_DATA));
     }
 
     @Test

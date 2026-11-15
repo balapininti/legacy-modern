@@ -197,10 +197,11 @@ class CardDemoCorpusIT {
         Path file = REPO.resolve("testdata/snapshots/carddemo-summary.json");
         Map<String, Object> s = new java.util.TreeMap<>(reports.summary());
         ObjectMapper om = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).enable(SerializationFeature.INDENT_OUTPUT);
-        String now = om.writeValueAsString(s);
+        // Jackson indents with the platform's line separator; the snapshot has LF on every platform.
+        String now = om.writeValueAsString(s).replace("\r\n", "\n");
         if (Boolean.getBoolean("snapshot.update") || !Files.exists(file)) {
             Files.writeString(file, now);
         }
-        assertThat(now).isEqualTo(Files.readString(file));
+        assertThat(now).isEqualTo(Files.readString(file).replace("\r\n", "\n"));
     }
 }

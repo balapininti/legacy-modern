@@ -46,7 +46,7 @@ class LauncherTest {
         assertThat(h.log()).isEqualTo(dir.resolve("data/logs/toolkit.log"));
         assertThat(h.pidFile()).isEqualTo(dir.resolve("data/toolkit.pid"));
         assertThat(h.pgHome(Map.of())).isEqualTo(dir.resolve("runtime/pgsql"));
-        assertThat(h.pgHome(Map.of("TOOLKIT_PG_HOME", "/opt/pg"))).isEqualTo(Path.of("/opt/pg"));
+        assertThat(h.pgHome(Map.of("TOOLKIT_PG_HOME", "/opt/pg"))).isEqualTo(Path.of("/opt/pg").toAbsolutePath().normalize());
     }
 
     @Test
@@ -96,7 +96,7 @@ class LauncherTest {
         Map<String, String> child = Launcher.childEnvironment(Map.of("TOOLKIT_PG_SUPERUSER_PASSWORD", "s", "TOOLKIT_DB_PASSWORD", "a"));
         assertThat(child).containsEntry(Launcher.CHILD_MARKER, "1").containsEntry("TOOLKIT_DB_PASSWORD", "a").doesNotContainKey("TOOLKIT_PG_SUPERUSER_PASSWORD");
         List<String> cmd = Launcher.javaCommand(h, Map.of("TOOLKIT_JAVA_OPTS", "-Xmx1g  -Dx=y"), Path.of("/x/toolkit.jar"), "doctor", "--a b");
-        assertThat(cmd).containsExactly(h.java().toString(), "-Xmx1g", "-Dx=y", "-jar", "/x/toolkit.jar", "doctor", "--a b");
+        assertThat(cmd).containsExactly(h.java().toString(), "-Xmx1g", "-Dx=y", "-jar", Path.of("/x/toolkit.jar").toString(), "doctor", "--a b");
     }
 
     @Command(name = "t")

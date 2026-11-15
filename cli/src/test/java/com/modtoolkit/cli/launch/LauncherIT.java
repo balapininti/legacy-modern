@@ -132,7 +132,7 @@ class LauncherIT {
         if (!Home.WINDOWS) {
             assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(home.resolve("config/toolkit.env")))).isEqualTo("rw-------");
         }
-        assertThat(ToolkitConfig.load(home.resolve("config/toolkit.yaml")).source().root()).isEqualTo(source.toString());
+        assertThat(ToolkitConfig.load(home.resolve("config/toolkit.yaml")).source().root()).isEqualTo(source.toString().replace('\\', '/'));
         assertThat(home.resolve("data/tls/toolkit.p12")).isRegularFile();
         assertThat(Files.readString(home.resolve("data/tls/toolkit.crt"))).startsWith("-----BEGIN CERTIFICATE-----").doesNotContain("PRIVATE KEY");
         assertThat(home.resolve("data/pg/PG_VERSION")).isRegularFile();
@@ -238,11 +238,18 @@ class LauncherIT {
             assertThat(Files.readString(log)).contains("toolkit is running");
             assertThat(get("/actuator/health").statusCode()).isEqualTo(200);
             assertThat(home.resolve("data/toolkit.pid")).as("so toolkit stop can end a service").isRegularFile();
-            // What a service manager or Ctrl+C does: end the launcher, whose shutdown hook stops the rest.
+            // What a service manager or Ctrl+C does: end the launcher, whose shutdown hook stops the rest. On Windows the
+            // JDK can only terminate a process, so no hook runs: the server ends itself when its launcher is gone, and
+            // the database stays up until toolkit stop (or the next start uses it).
             launcher.toHandle().destroy();
             assertThat(launcher.waitFor(2, TimeUnit.MINUTES)).isTrue();
         } finally {
             launcher.destroyForcibly();
+        }
+        if (Home.WINDOWS) {
+            for (int i = 0; i < 120 && !portFree(https); i++) Thread.sleep(500);
+            assertThat(portFree(https)).as("the server ended with its launcher").isTrue();
+            ok("stop");
         }
         assertNothingRuns();
         assertThat(home.resolve("data/toolkit.pid")).doesNotExist();
@@ -255,7 +262,7 @@ class LauncherIT {
         String before = EnvFile.read(home.resolve("config/toolkit.env")).get("TOOLKIT_DB_PASSWORD");
         ok("setup", "--source", source.toString(), "--target", target.toString(), "--force", "--port", Integer.toString(https), "--pg-port", Integer.toString(pgPort));
         assertThat(EnvFile.read(home.resolve("config/toolkit.env")).get("TOOLKIT_DB_PASSWORD")).isNotEqualTo(before);
-        assertThat(ToolkitConfig.load(home.resolve("config/toolkit.yaml")).target().localPath()).isEqualTo(target.toString());
+        assertThat(ToolkitConfig.load(home.resolve("config/toolkit.yaml")).target().localPath()).isEqualTo(target.toString().replace('\\', '/'));
         assertNothingRuns();
     }
 

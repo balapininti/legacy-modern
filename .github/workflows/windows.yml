@@ -103,7 +103,8 @@ jobs:
           for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VS=%%i"
           call "%VS%\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
           mkdir dumpbin-check
-          tar -xf target\toolkit-*-windows-x64.zip -C dumpbin-check toolkit/runtime/pgsql/bin/postgres.exe toolkit/runtime/pgsql/bin/initdb.exe toolkit/runtime/pgsql/bin/pg_ctl.exe toolkit/runtime/pgsql/lib/vector.dll toolkit/runtime/pgsql/bin/icuuc67.dll || exit /b 1
+          for %%z in (target\toolkit-*-windows-x64.zip) do set "ZIP=%%z"
+          tar -xf "%ZIP%" -C dumpbin-check toolkit/runtime/pgsql/bin/postgres.exe toolkit/runtime/pgsql/bin/initdb.exe toolkit/runtime/pgsql/bin/pg_ctl.exe toolkit/runtime/pgsql/lib/vector.dll toolkit/runtime/pgsql/bin/icuuc67.dll || exit /b 1
           for %%f in (dumpbin-check\toolkit\runtime\pgsql\bin\postgres.exe dumpbin-check\toolkit\runtime\pgsql\bin\initdb.exe dumpbin-check\toolkit\runtime\pgsql\bin\pg_ctl.exe dumpbin-check\toolkit\runtime\pgsql\lib\vector.dll dumpbin-check\toolkit\runtime\pgsql\bin\icuuc67.dll) do (
             echo ==== %%~nxf
             dumpbin /nologo /dependents "%%f" | findstr /i "\.dll"
