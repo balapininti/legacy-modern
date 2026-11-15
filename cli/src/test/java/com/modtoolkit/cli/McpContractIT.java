@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.modtoolkit.core.testdb.TestPostgres;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
@@ -38,8 +39,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /** Drives the real jar over both transports with the MCP Java client, on the real CardDemo facts. */
 @TestMethodOrder(MethodOrderer.MethodName.class)
@@ -48,7 +47,7 @@ class McpContractIT {
     static final Path JAR = REPO.resolve("cli/target/toolkit.jar");
     static final Path CORPUS = REPO.resolve(".cache/corpora/carddemo");
     static final ObjectMapper OM = new ObjectMapper();
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    static TestPostgres.Database pg;
 
     static Process http;
     static int port;
@@ -85,7 +84,7 @@ class McpContractIT {
     static void start() throws Exception {
         assumeTrue(Files.isDirectory(CORPUS.resolve("app/cbl")), "run scripts/fetch-corpora.sh first");
         assumeTrue(Files.exists(JAR), "package the jar first");
-        pg.start();
+        pg = TestPostgres.newDatabase();
         targetRepo = TargetRepoFixture.create(REPO, Files.createTempDirectory("target"));
         run("discover", "--root", CORPUS.toString(), "--threads", "8", "--target", targetRepo.toString());
         run("index");

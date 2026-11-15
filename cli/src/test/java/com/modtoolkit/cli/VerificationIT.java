@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.modtoolkit.core.testdb.TestPostgres;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,8 +18,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * M7. The expected results are bytes the real COBOL wrote, running under GnuCOBOL (scripts/capture-gnucobol.sh). The
@@ -29,7 +28,7 @@ class VerificationIT {
     static final Path JAR = REPO.resolve("cli/target/toolkit.jar");
     static final Path CORPUS = REPO.resolve(".cache/corpora/carddemo");
     static final Path CAPTURE = REPO.resolve("testdata/captures/CBACT04C");
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    static TestPostgres.Database pg;
     static final ObjectMapper OM = new ObjectMapper();
 
     private static Map<String, String> env() {
@@ -88,7 +87,7 @@ class VerificationIT {
     @Test
     void capturedBehaviorDrivesTestsThatPassFailOnABrokenRuleAndHonourADeviation() throws Exception {
         assumeTrue(Files.isDirectory(CORPUS.resolve("app/cbl")) && Files.isDirectory(CAPTURE.resolve("run1")) && Files.exists(JAR));
-        pg.start();
+        pg = TestPostgres.newDatabase();
         toolkit("discover", "--root", CORPUS.toString(), "--threads", "8");
         String imported = toolkit("capture", "import", "--dir", CAPTURE.toString(), "--encoding", "utf-8");
         assertThat(imported).contains("fixtures=3");

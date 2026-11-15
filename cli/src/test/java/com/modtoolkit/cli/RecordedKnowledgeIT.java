@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.modtoolkit.core.testdb.TestPostgres;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -15,8 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Answers a real model gave on real CardDemo programs, replayed: no network, per the spec's "no live LLM in CI". Each
@@ -26,7 +25,7 @@ class RecordedKnowledgeIT {
     static final Path REPO = Path.of("..").toAbsolutePath().normalize();
     static final Path JAR = REPO.resolve("cli/target/toolkit.jar");
     static final Path CORPUS = REPO.resolve(".cache/corpora/carddemo");
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    static TestPostgres.Database pg;
 
     private record Run(int exit, String out) {}
 
@@ -43,7 +42,7 @@ class RecordedKnowledgeIT {
     @Test
     void realModelAnswersValidateAndEveryRuleCitesRealCode() throws Exception {
         assumeTrue(Files.isDirectory(CORPUS.resolve("app/cbl")) && Files.exists(JAR));
-        pg.start();
+        pg = TestPostgres.newDatabase();
         assertThat(toolkit("discover", "--root", CORPUS.toString(), "--threads", "8").exit()).isZero();
         Path cfg = Files.createTempFile("k", ".yaml");
         Files.writeString(cfg, "client: x\nsource:\n  root: " + CORPUS + "\nllm:\n  provider: openai-compatible\n  chat_model: gpt-oss-32k:latest\n");

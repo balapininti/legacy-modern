@@ -15,8 +15,15 @@
     <dependency><groupId>com.fasterxml.jackson.datatype</groupId><artifactId>jackson-datatype-jsr310</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
     <dependency><groupId>com.google.jimfs</groupId><artifactId>jimfs</artifactId><scope>test</scope></dependency>
-    <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>
-    <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
   </dependencies>
-
+  <build><plugins>
+    <!-- Publishes the shared test database (com.modtoolkit.core.testdb) to the other modules' tests. -->
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-jar-plugin</artifactId>
+      <executions><execution><goals><goal>test-jar</goal></goals>
+        <configuration><includes><include>com/modtoolkit/core/testdb/**</include></includes></configuration>
+      </execution></executions>
+    </plugin>
+  </plugins></build>
 </project>

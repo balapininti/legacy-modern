@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.modtoolkit.core.testdb.TestPostgres;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.RSASSASigner;
@@ -34,15 +35,13 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /** The REST API from outside the real jar: roles per the Module 7 table, OIDC with really signed tokens, and data. */
 class ApiIT {
     static final Path REPO = Path.of("..").toAbsolutePath().normalize();
     static final Path JAR = REPO.resolve("cli/target/toolkit.jar");
     static final Path CORPUS = REPO.resolve(".cache/corpora/carddemo");
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
+    static TestPostgres.Database pg;
     static final ObjectMapper OM = new ObjectMapper();
     static Process api;
     static HttpServer idp;
@@ -73,7 +72,7 @@ class ApiIT {
     @BeforeAll
     static void up() throws Exception {
         assumeTrue(Files.isDirectory(CORPUS.resolve("app/cbl")) && Files.exists(JAR));
-        pg.start();
+        pg = TestPostgres.newDatabase();
         key = new RSAKeyGenerator(2048).keyID("k1").generate();
         idp = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         issuer = "http://localhost:" + idp.getAddress().getPort() + "/realm";

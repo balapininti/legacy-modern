@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.modtoolkit.core.testdb.TestPostgres;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -16,19 +17,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /** The M1 acceptance: real CardDemo, pinned commit. Fetch it with scripts/fetch-corpora.sh. */
 @SpringBootTest(properties = {"spring.batch.job.enabled=false", "spring.datasource.hikari.maximum-pool-size=24", "spring.datasource.hikari.connection-init-sql=SET lock_timeout = '30s'"})
 class CardDemoCorpusIT {
     static final Path REPO = Path.of("..").toAbsolutePath().normalize();
     static final Path CORPUS = REPO.resolve(".cache/corpora/carddemo");
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
-
-    static {
-        pg.start();
-    }
+    static final TestPostgres.Database pg = TestPostgres.newDatabase();
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
