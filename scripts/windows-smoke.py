@@ -450,7 +450,7 @@ class Smoke:
         der = base64.b64decode("".join(l for l in crt.read_text().splitlines() if l and not l.startswith("-----")))
         thumb = hashlib.sha1(der).hexdigest()
         notes = []
-        rc, out = self.run(["certutil", "-user", "-addstore", "Root", str(crt)], timeout=60)
+        rc, out = self.run(["certutil", "-user", "-addstore", "Root", str(crt)], timeout=30)
         user_ok = rc == 0
         notes.append(f"certutil -user -addstore Root: {'ok' if user_ok else 'exit ' + str(rc)}")
         machine = False
@@ -485,7 +485,7 @@ class Smoke:
         hidden = []
         jre_bin = self.install / "runtime" / "jre" / "bin"
         minimal = dict(self.base_env, PATH=f"{sys32};{sys32.parent}")
-        tmp = pathlib.Path(tempfile.mkdtemp(prefix="vc-", dir=str(self.install.parent)))
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="vc-", dir=str(self.install / "data")))
         try:
             for n in names:
                 p = sys32 / n
