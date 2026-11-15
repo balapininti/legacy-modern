@@ -1,0 +1,68 @@
+# Every block of config\toolkit.yaml, with example values. `toolkit.cmd setup` writes a working toolkit.yaml for you;
+# copy blocks from here into it as you need them. Secrets never go in this file: put them in config\toolkit.env
+# (NAME=value lines) and name the variable here (api_key_env, user_env, password_env).
+# Paths may use / or \. Quote a path that contains a space or a colon: 'D:/Mainframe export'.
+client: acme-insurance
+source:
+  root: 'D:/Mainframe export'   # a git checkout or a PDS export, as files
+  refresh: manual               # manual | git
+  encoding: auto                # auto | cp037 | cp1047 | utf-8
+  format: auto                  # auto | fixed | free
+  dialect: ibm-enterprise       # ibm-enterprise | microfocus
+  include: ["**/*"]
+  exclude: ["**/*.lst"]
+
+# The knowledge pass. Needs written data-policy sign-off for the endpoint, or a local model (Ollama, below).
+#llm:
+#  provider: azure-openai       # azure-openai | bedrock | openai | anthropic | openai-compatible
+#  endpoint: https://your-endpoint.example.internal
+#  api_key_env: TOOLKIT_LLM_KEY # put TOOLKIT_LLM_KEY=... in config\toolkit.env
+#  chat_model: gpt-4.1
+#  embedding_model: text-embedding-3-large
+#  embedding_dim: 3072
+#  budget_usd_per_run: 500
+#  input_usd_per_mtok: 2.50
+#  output_usd_per_mtok: 10.00
+#  concurrency: 4
+#  redact_pii: true
+#  pii_patterns: ["\\b\\d{3}-\\d{2}-\\d{4}\\b"]
+#
+# A local model with Ollama on this machine (no key needed):
+#llm:
+#  provider: openai-compatible
+#  endpoint: http://localhost:11434
+#  chat_model: qwen2.5-coder:14b
+#  embedding_model: nomic-embed-text
+#  embedding_dim: 768
+#  budget_tokens_per_run: 20000000
+
+# Test LPAR access for captures. method none: export datasets by hand and run toolkit capture import.
+zos:
+  enabled: false
+  method: none                  # zowe | ftp-jes | none
+#  host: testlpar.example.internal
+#  user_env: TOOLKIT_ZOS_USER
+#  password_env: TOOLKIT_ZOS_PASS
+#  command: zowe.cmd            # the Zowe CLI; default zowe.cmd on Windows
+#  job_card: "//TKCAPT JOB (ACCT),'CAPTURE',CLASS=A,MSGCLASS=X"
+#  work_hlq: TK.CAPTURE
+
+# The modern (Java and Angular) repository, when there is one.
+#target:
+#  java: 21
+#  spring_boot: "3.4"
+#  angular: 19
+#  build: maven                 # maven | gradle
+#  database: postgresql         # postgresql | oracle | sqlserver
+#  local_path: 'D:/repos/modernized-app'
+#  index_existing: true
+#  package_root: com.acme.policy
+
+#scope:
+#  phase1_programs: ["CBACT01C", "CBTRN02C"]
+#  phase1_jobs: ["TRANBKP", "POSTTRAN"]
+
+# Sign-in with the client's identity provider (OIDC). Also set TOOLKIT_OIDC_ISSUER in config\toolkit.env.
+#ui:
+#  oidc_issuer: https://login.example.internal
+#  oidc_client_id_env: TOOLKIT_OIDC_CLIENT

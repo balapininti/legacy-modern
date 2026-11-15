@@ -1,0 +1,40 @@
+<!--
+  Windows service mode for the toolkit, for WinSW 2.12 (service\toolkit.exe is WinSW-x64.exe renamed, so WinSW reads
+  this file: same folder, same base name). Install it with service.cmd from an administrator command prompt.
+
+  The service runs exactly what start.cmd runs, in the foreground: the toolkit's PostgreSQL, then the server (web UI,
+  REST API and MCP on one HTTPS port). Stopping the service runs "toolkit stop", which stops the server and then the
+  database; WinSW waits for both. Every path is relative to %BASE%, this service folder, so the install folder may be
+  anywhere, spaces included.
+
+  The service runs as LocalSystem. To run it as a domain or local user instead, add a <serviceaccount> block
+  (https://github.com/winsw/winsw/blob/v2.12.0/doc/xmlConfigFile.md#service-account); that user needs full control of
+  the install folder and read access to the source folder.
+-->
+<service>
+  <id>toolkit</id>
+  <name>Mainframe Modernization Toolkit</name>
+  <description>Web UI, REST API and MCP server of the Mainframe Modernization Toolkit, with its PostgreSQL database.</description>
+
+  <executable>%BASE%\..\runtime\jre\bin\java.exe</executable>
+  <startarguments>"-DTOOLKIT_HOME=%BASE%\.." -jar "%BASE%\..\lib\toolkit.jar" start --foreground</startarguments>
+  <stopexecutable>%BASE%\..\runtime\jre\bin\java.exe</stopexecutable>
+  <stoparguments>"-DTOOLKIT_HOME=%BASE%\.." -jar "%BASE%\..\lib\toolkit.jar" stop</stoparguments>
+  <!-- toolkit stop gives the server 60 s, then PostgreSQL up to 60 s for a fast shutdown. -->
+  <stoptimeout>150sec</stoptimeout>
+  <workingdirectory>%BASE%\..</workingdirectory>
+
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <onfailure action="none"/>
+  <resetfailure>1 hour</resetfailure>
+
+  <!-- toolkit.out.log, toolkit.err.log and toolkit.wrapper.log, next to the server's own logs; 10 MB each, 8 kept. -->
+  <logpath>%BASE%\..\data\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>
