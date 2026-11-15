@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /** No LPAR here: these prove the commands sent and the parsing, against a stand-in zowe executable. */
@@ -37,6 +39,7 @@ class CaptureClientsTest {
     }
 
     @Test
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "the stand-in Zowe CLI is a POSIX shell script; the Windows zowe.cmd path is covered by the batch-file test below")
     void zoweSubmitsWaitsAndDownloadsInBinary() throws Exception {
         ZoweCapture z = new ZoweCapture(fakeZowe().toString(), "lpar", "u", "s3cr&t");
         String job = z.submit("//TK JOB\n");

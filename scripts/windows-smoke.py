@@ -284,6 +284,16 @@ class Smoke:
             lines.append(f"{exe}: missing {missing or 'none'}; from outside the install and Windows: {outside or 'none'}")
         sys32 = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
         lines.append("System32 has: " + ", ".join(n for n in ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll") if (sys32 / n).is_file()))
+        initdb = str(self.install / "runtime" / "pgsql" / "bin" / "initdb.exe")
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="diag ", dir=str(self.install.parent)))
+        (tmp / "pw").write_text("x\n")
+        jre_path = dict(self.base_env, PATH=self.base_env.get("PATH", "") + os.pathsep + str(self.install / "runtime" / "jre" / "bin"))
+        for label, argv, env in (("--version", [initdb, "--version"], self.base_env),
+                                 ("init, data dir with a space", [initdb, "-D", str(tmp / "d 1"), "-U", "x", "--pwfile", str(tmp / "pw"), "-A", "scram-sha-256", "--no-instructions"], self.base_env),
+                                 ("init, PATH + jre", [initdb, "-D", str(tmp / "d2"), "-U", "x", "--pwfile", str(tmp / "pw"), "-A", "scram-sha-256", "--no-instructions"], jre_path)):
+            rc, out = self.run(argv, env=env, timeout=300)
+            lines.append(f"initdb {label}: exit {rc} {tail(out, 6)}")
+        shutil.rmtree(tmp, ignore_errors=True)
         return "\n".join(lines)
 
     def setup(self):
