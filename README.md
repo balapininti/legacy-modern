@@ -8,6 +8,7 @@ The toolkit does not translate code. Agents such as Claude Code or GitHub Copilo
 
 - **Install:** [deploy/INSTALL.md](deploy/INSTALL.md), the only document an installer needs
 - **What is proved and what is not:** [docs/STATUS.md](docs/STATUS.md)
+- **Changing the code (people and agents):** [docs/PROJECT-CONTEXT.md](docs/PROJECT-CONTEXT.md), [.github/copilot-instructions.md](.github/copilot-instructions.md), [AGENTS.md](AGENTS.md)
 - **Spec:** [docs/spec/build-spec.md](docs/spec/build-spec.md)
 - **Decisions:** [docs/adr](docs/adr)
 - **Evidence per milestone:** [docs/evidence](docs/evidence)
