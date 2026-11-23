@@ -185,8 +185,20 @@ VS Code Copilot agent mode, in `.vscode\mcp.json`:
 
 Cursor uses the same shape in `.cursor\mcp.json`, under `mcpServers`.
 
+GitHub Copilot CLI (it stores the server in `%USERPROFILE%\.copilot\mcp-config.json`; `/mcp show legacy` inside
+Copilot CLI lists the tools). It runs on Node.js: if it reports a certificate error, set `NODE_EXTRA_CA_CERTS` as for
+Claude Code above.
+
+```bat
+copilot mcp add --transport http --header "Authorization: Bearer <token>" legacy https://<host>:8443/mcp
+```
+
 Ask: *"What does inventory_summary say?"*, then *"What calls PROGRAMX, and which DB2 tables does it touch?"* with a
 real program name. You are done when the answer cites members and lines.
+
+**What to do next is in `USING.md`**, in this folder: how to go from loaded programs to understanding the system,
+its rules and dependencies, and a migration plan, with the prompts to type. It also installs the `legacy-modernize`
+skill for Copilot CLI from the `skills` folder.
 
 **Clients on other machines** need an inbound firewall rule for the port, once, from an administrator Command Prompt:
 

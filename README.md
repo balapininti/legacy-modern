@@ -7,6 +7,7 @@ The toolkit does not translate code. Agents such as Claude Code or GitHub Copilo
 ## Where to start
 
 - **Install:** [deploy/INSTALL.md](deploy/INSTALL.md), the only document an installer needs
+- **Use it once the programs are loaded:** [deploy/USING.md](deploy/USING.md), the flow from "what is this system?" to a migrated and verified slice, with the prompts to type in GitHub Copilot CLI and the [`legacy-modernize` skill](deploy/skills/legacy-modernize/SKILL.md)
 - **What is proved and what is not:** [docs/STATUS.md](docs/STATUS.md)
 - **Changing the code (people and agents):** [docs/PROJECT-CONTEXT.md](docs/PROJECT-CONTEXT.md), [.github/copilot-instructions.md](.github/copilot-instructions.md), [AGENTS.md](AGENTS.md)
 - **Spec:** [docs/spec/build-spec.md](docs/spec/build-spec.md)

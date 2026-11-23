@@ -247,7 +247,8 @@ class Smoke:
             z.extractall(tmp)
         (tmp / "toolkit").rename(self.install)
         tmp.rmdir()
-        for p in ("toolkit.cmd", "start.cmd", "stop.cmd", "INSTALL.md", "sbom.json", "LICENSES/INVENTORY.md", "lib/toolkit.jar", "ui/index.html",
+        for p in ("toolkit.cmd", "start.cmd", "stop.cmd", "INSTALL.md", "USING.md", "skills/legacy-modernize/SKILL.md",
+                  "skills/legacy-modernize/templates.md", "sbom.json", "LICENSES/INVENTORY.md", "lib/toolkit.jar", "ui/index.html",
                   "config/toolkit.yaml.example", "runtime/jre/bin/java.exe", "runtime/pgsql/bin/postgres.exe", "runtime/node/node.exe",
                   "tools/ng-extract/extract.js", "tools/ng-extract/node_modules/typescript/package.json", "service/toolkit.exe", "service/toolkit.xml",
                   "service/service.cmd"):

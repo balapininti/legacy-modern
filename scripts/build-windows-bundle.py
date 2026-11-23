@@ -540,6 +540,15 @@ def main():
             (stage / f).write_bytes(data)
         install = (ROOT / "deploy" / "INSTALL.md").read_text(encoding="utf-8")
         (stage / "INSTALL.md").write_text(install, encoding="utf-8", newline="\r\n")
+        # The guide for after the install, and the Copilot CLI skill it tells users to copy.
+        using = (ROOT / "deploy" / "USING.md").read_text(encoding="utf-8")
+        (stage / "USING.md").write_text(using, encoding="utf-8", newline="\r\n")
+        skills = ROOT / "deploy" / "skills"
+        for src in sorted(p for p in skills.rglob("*") if p.is_file()):
+            dst = stage / "skills" / src.relative_to(skills)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            # LF kept: a skill's YAML front matter is read by agents on every platform
+            dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
         (stage / "lib").mkdir()
         shutil.copy2(jar, stage / "lib" / "toolkit.jar")
         shutil.copytree(ui, stage / "ui")
