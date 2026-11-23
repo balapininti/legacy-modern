@@ -21,7 +21,7 @@ The toolkit does not translate code. Agents such as Claude Code or GitHub Copilo
 | `parsers`, `discovery` | COBOL, copybooks, JCL, BMS, DDL and CSD into a graph, with every fact traced to a line. PL/I, REXX and Assembler are inventoried only |
 | `retrieval` | Lexical and vector search fused, with reviewed knowledge ranked higher |
 | `knowledge` | LLM summaries, rules and migration notes, each validated against the source, then reviewed by people |
-| `mcp` | 19 tools, 4 prompts and 3 resource templates over Streamable HTTP and stdio |
+| `mcp` | 20 tools (start with `estate_map`: the jobs, transactions, screens, programs and data stores by name), 4 prompts and 3 resource templates over Streamable HTTP and stdio |
 | `rulebook` | Generates `CLAUDE.md` and Copilot instructions from your repository's conventions |
 | `verify` | Decodes captured datasets and generates JUnit tests against them |
 | `api`, `ui` | Web UI for review, target-code links, deviations, gaps and tracking |

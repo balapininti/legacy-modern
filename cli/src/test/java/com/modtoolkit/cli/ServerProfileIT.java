@@ -221,7 +221,7 @@ class ServerProfileIT {
             McpSyncClient c = mcp(v);
             try {
                 List<McpSchema.Tool> tools = c.listTools().tools();
-                assertThat(tools).as(v.toString()).hasSize(19);
+                assertThat(tools).as(v.toString()).hasSize(20);
                 assertThat(tools.stream().map(McpSchema.Tool::name).collect(Collectors.toSet())).isEqualTo(ContractTools.EXPECTED);
             } finally {
                 c.closeGracefully();

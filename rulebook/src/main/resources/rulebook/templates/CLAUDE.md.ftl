@@ -2,7 +2,7 @@
 
 COBOL to Java ${java}, Spring Boot ${springBoot}<#if angular?has_content>, Angular ${angular}</#if>. The legacy system is queried through the toolkit's MCP server. Full conventions: `.github/copilot-instructions.md`.
 
-Before translating or fixing anything, call `get_program`, `business_rules`, `get_copybook`, `deviations` and `get_modern_impl`.
+Before translating or fixing anything, call `get_program`, `business_rules`, `get_copybook`, `deviations` and `get_modern_impl`. To find a program, job, transaction or screen by name, start with `estate_map`.
 
 **A registered deviation is never reverted to legacy behavior.** Check `deviations` before "fixing" a difference from the COBOL. If you find a new intentional difference, propose it with `record_deviation`.
 

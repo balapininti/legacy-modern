@@ -269,6 +269,109 @@ class McpContractIT {
         assertThat(who.get("items").findValues("edge_type").stream().map(JsonNode::asText).toList()).contains("JCL_STEP");
     }
 
+    static JsonNode named(JsonNode result, String field, String name) {
+        for (JsonNode i : result.get("items")) if (name.equals(i.path(field).asText())) return i;
+        throw new AssertionError("no item with " + field + " " + name);
+    }
+
+    static String sourceLine(McpSyncClient c, JsonNode item) throws Exception {
+        int line = item.get("line").asInt();
+        return ok(c, "get_source", Map.of("member", item.get("member").asText(), "line_start", line, "line_end", line)).get("items").get(0).get("text").asText();
+    }
+
+    /** estate_map names the entry points from discovery facts alone, and each name is cited where the source says it. */
+    @ParameterizedTest
+    @ValueSource(strings = {"http", "stdio"})
+    void b3_estateMapNamesTheEntryPointsWithProvenance(String t) throws Exception {
+        McpSyncClient c = client(t);
+        JsonNode overview = ok(c, "estate_map", Map.of());
+        JsonNode o = overview.get("items").get(0);
+        assertThat(o.get("kind").asText()).isEqualTo("overview");
+        assertThat(o.get("programs").get("total").asInt()).isEqualTo(44);
+        assertThat(o.get("programs").get("by_kind").get("batch").asInt() + o.get("programs").get("by_kind").get("cics").asInt() + o.get("programs").get("by_kind").get("subroutine").asInt()).isEqualTo(44);
+        assertThat(o.get("jobs").asInt()).isEqualTo(56);
+        assertThat(o.get("transactions").asInt()).isEqualTo(30);
+        assertThat(o.get("screens").asInt()).isEqualTo(21);
+        assertThat(o.get("knowledge").get("programs_with_summary").asInt()).isZero();
+        assertThat(o.get("knowledge").get("advice").asText()).contains("get_source");
+        assertThat(o.get("entry_points").get("jobs_total").asInt()).isEqualTo(56);
+        List<String> next = new ArrayList<>();
+        o.get("next").forEach(n -> next.add(n.asText()));
+        assertThat(next).contains("estate_map {\"area\":\"jobs\"}").anyMatch(n -> n.startsWith("get_program {\"name\":\"")).anyMatch(n -> n.startsWith("job_flow {\"job\":\""));
+        assertThat(overview.get("items").findValues("kind").stream().map(JsonNode::asText).toList()).contains("job", "transaction");
+        assertThat(ok(c, "estate_map", Map.of("area", "overview")).get("total_items").asInt()).isEqualTo(overview.get("total_items").asInt());
+
+        JsonNode jobs = ok(c, "estate_map", Map.of("area", "jobs"));
+        assertThat(jobs.get("total_items").asInt()).isEqualTo(56);
+        JsonNode job = named(jobs, "job", "CREASTMT");
+        assertThat(job.get("member").asText()).isEqualTo("app/jcl/CREASTMT.JCL");
+        assertThat(job.get("line").asInt()).isEqualTo(1);
+        assertThat(job.get("steps").asInt()).isEqualTo(5);
+        assertThat(job.get("programs").toString()).isEqualTo("[\"IDCAMS\",\"SORT\",\"IEFBR14\",\"CBSTM03A\"]");
+        assertThat(job.get("programs_with_source").toString()).isEqualTo("[\"CBSTM03A\"]");
+        assertThat(job.get("scheduler_hint").isBoolean()).isTrue();
+        assertThat(sourceLine(c, job)).startsWith("//CREASTMT JOB");
+        assertThat(named(jobs, "job", "POSTTRAN").get("programs").toString()).isEqualTo("[\"CBTRN02C\"]");
+        JsonNode tran = ok(c, "estate_map", Map.of("area", "jobs", "name_prefix", "tran"));
+        assertThat(tran.get("items")).isNotEmpty().allMatch(i -> i.get("job").asText().startsWith("TRAN"));
+
+        JsonNode txs = ok(c, "estate_map", Map.of("area", "transactions"));
+        assertThat(txs.get("total_items").asInt()).isEqualTo(30);
+        JsonNode tx = named(txs, "transaction", "CC00");
+        assertThat(tx.get("program").asText()).isEqualTo("COSGN00C");
+        assertThat(tx.get("program_member").asText()).isEqualTo("app/cbl/COSGN00C.cbl");
+        assertThat(tx.get("maps").toString()).isEqualTo("[\"COSGN0A\"]");
+        assertThat(tx.get("member").asText()).isEqualTo("app/csd/CARDDEMO.CSD");
+        assertThat(tx.get("line").asInt()).isEqualTo(378);
+        assertThat(sourceLine(c, tx)).contains("DEFINE TRANSACTION(CC00)");
+
+        JsonNode screen = named(ok(c, "estate_map", Map.of("area", "screens")), "map", "COSGN0A");
+        assertThat(screen.get("mapset").asText()).isEqualTo("COSGN00");
+        assertThat(screen.get("member").asText()).isEqualTo("app/bms/COSGN00.bms");
+        assertThat(screen.get("fields").asInt()).isPositive();
+        assertThat(screen.get("programs").toString()).contains("COSGN00C");
+        assertThat(sourceLine(c, screen)).startsWith("COSGN0A DFHMDI");
+
+        JsonNode programs = ok(c, "estate_map", Map.of("area", "programs"));
+        assertThat(programs.get("total_items").asInt()).isEqualTo(44);
+        assertThat(programs.get("items").get(0).get("entry_point").asBoolean()).as("entry points come first").isTrue();
+        JsonNode batch = named(programs, "program", "CBTRN02C");
+        assertThat(batch.get("program_kind").asText()).isEqualTo("batch");
+        assertThat(batch.get("member").asText()).isEqualTo("app/cbl/CBTRN02C.cbl");
+        assertThat(batch.get("entered_by").toString()).isEqualTo("[\"job POSTTRAN step STEP15\"]");
+        assertThat(batch.get("has_summary").asBoolean()).isFalse();
+        assertThat(named(programs, "program", "COSGN00C").get("entered_by").get(0).asText()).isEqualTo("transaction CC00");
+        JsonNode sub = named(programs, "program", "CBSTM03B");
+        assertThat(sub.get("entry_point").asBoolean()).isFalse();
+        assertThat(sub.get("entered_by").toString()).isEqualTo("[\"called by 1 program\"]");
+        for (JsonNode p : programs.get("items")) assertThat(p.get("member").asText().isBlank() || p.get("line_start").asInt() < 1 || p.get("loc").asInt() < 1).as(p.toString()).isFalse();
+
+        JsonNode data = ok(c, "estate_map", Map.of("area", "data"));
+        JsonNode table = named(data, "name", "TRANSACTION_TYPE");
+        assertThat(table.get("kind").asText()).isEqualTo("db2_table");
+        assertThat(table.get("ddl_in_export").asBoolean()).isTrue();
+        assertThat(table.get("readers").toString()).contains("COTRTLIC");
+        assertThat(table.get("writers").toString()).contains("COTRTUPC");
+        assertThat(sourceLine(c, table)).contains("CREATE TABLE").contains("TRANSACTION_TYPE");
+        assertThat(named(data, "name", "SYSDUMMY1").get("ddl_in_export").asBoolean()).isFalse();
+        JsonNode file = named(data, "name", "ACCTFILE");
+        assertThat(file.get("kind").asText()).isEqualTo("file");
+        assertThat(file.get("read_by").asInt()).isEqualTo(6);
+        assertThat(file.get("writers").toString()).contains("CBTRN02C");
+        assertThat(file.get("datasets").toString()).contains("AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS");
+        assertThat(sourceLine(c, file)).contains("ASSIGN TO ACCTFILE");
+        assertThat(named(data, "name", "USRSEC").get("kind").asText()).isEqualTo("cics_file");
+        for (JsonNode area : List.of(jobs, txs, data)) {
+            for (JsonNode i : area.get("items")) assertThat(i.get("member").asText().isBlank() || i.get("line").asInt() < 1).as(i.toString()).isFalse();
+        }
+
+        JsonNode bad = error(c, "estate_map", Map.of("area", "everything"));
+        assertThat(bad.get("code").asText()).isEqualTo("BAD_ARGUMENT");
+        assertThat(bad.get("hint").asText()).contains("overview", "jobs", "transactions", "screens", "programs", "data");
+        JsonNode summary = ok(c, "get_program", Map.of("name", "CBTRN02C", "include", List.of("summary"))).get("items").get(1).get("value");
+        assertThat(summary.get("reason").asText()).contains("get_source").contains("toolkit knowledge run");
+    }
+
     /** Review Focus 5 over the wire. */
     @ParameterizedTest
     @ValueSource(strings = {"http", "stdio"})

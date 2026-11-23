@@ -316,10 +316,16 @@ Implemented in `mcp/src/main/java/com/modtoolkit/mcp`; frozen names in `cli/src/
 
 | Group (class) | Tools |
 |---|---|
+| Estate (`EstateTools`) | `estate_map` |
 | Legacy (`LegacyTools`) | `inventory_summary`, `search`, `get_program`, `get_source`, `get_copybook`, `who_calls`, `calls_from`, `business_rules`, `table_usage` |
 | Flow (`FlowTools`) | `job_flow`, `screen_flow`, `trace_field` |
 | Modern (`ModernTools`) | `get_modern_impl`, `gap_report`, `deviations`, `record_deviation` |
 | Planning (`PlanningTools`) | `migration_status`, `record_decision`, `explain_feature` |
+
+`estate_map` is where an agent starts on an estate it does not know: `area` is `overview` (default), `jobs`,
+`transactions`, `screens`, `programs` or `data`, and `name_prefix` narrows a large estate. It reads discovery facts
+only, so it answers before the knowledge pass has run. `inventory_summary` is counts only. Where a summary or rules
+are missing, `get_program` says so and tells the agent to read the code with `get_source` and cite the lines.
 
 Prompts (`McpExtras`): `analyze_program`, `plan_migration`, `translate_program`, `write_characterization_tests`.
 Resource templates: `legacy://program/{name}`, `legacy://copybook/{name}`, `legacy://job/{name}` (served through
@@ -344,7 +350,7 @@ the options.
    with `member` and `line`; throw `ToolError` for expected failures. Do not page, check roles or audit in the handler.
 2. Add the name to `ContractTools.EXPECTED` and assertions on real CardDemo data to `McpContractIT` for both
    transports.
-3. Change the count 19 in `ServerProfileIT`, `LauncherIT` (3 places) and `scripts/windows-smoke.py` (3 places).
+3. Change the count 20 in `ServerProfileIT`, `LauncherIT` (3 places) and `scripts/windows-smoke.py` (5 places).
 4. Add the name to `RulebookLint.TOOLS`, and to the rulebook templates if agents should call it.
 5. Update `README.md`, this file, and `docs/STATUS.md`. Run `mvnw.cmd -B verify -pl cli -am -Dit.test=McpContractIT,ServerProfileIT,LauncherIT -Dtest=NoSuchTestClass -Dsurefire.failIfNoSpecifiedTests=false -Dfailsafe.failIfNoSpecifiedTests=false`.
 

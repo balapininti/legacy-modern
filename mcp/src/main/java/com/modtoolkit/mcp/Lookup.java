@@ -53,7 +53,7 @@ public class Lookup {
 
     public ToolError notFound(String what, String name, String suggestSql) {
         List<String> near = jdbc.queryForList(suggestSql, String.class, name, name);
-        String hint = near.isEmpty() ? "check the name with search or inventory_summary" : "did you mean " + near + "?";
+        String hint = near.isEmpty() ? "list the real names with estate_map, or find one with search" : "did you mean " + near + "?";
         return new ToolError("NOT_FOUND", "no " + what + " named " + name, hint);
     }
 
@@ -78,7 +78,7 @@ public class Lookup {
                 SELECT a.id AS artifact_id, a.status, a.content::text AS content, a.line_start, a.line_end, m.path AS member
                 FROM knowledge_artifact a LEFT JOIN member m ON m.id = a.member_id
                 WHERE a.unit_kind = 'program' AND a.unit_id = ? AND a.kind = ? AND a.status <> 'rejected' ORDER BY a.status = 'reviewed' DESC, a.id""", programId, kind);
-        if (rows.isEmpty()) return Map.of("status", "not_available", "reason", "the knowledge pass has not produced a " + kind + " for " + name);
+        if (rows.isEmpty()) return Map.of("status", "not_available", "reason", "the knowledge pass has not produced a " + kind.replace('_', ' ') + " for " + name + "; " + EstateTools.WITHOUT_KNOWLEDGE);
         return rows.stream().map(Lookup::withContent).toList();
     }
 
