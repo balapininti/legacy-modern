@@ -173,6 +173,23 @@ That is the strongest proof available: the same inputs give the same outputs.
 **You are done when** every rule in the catalogue is covered, changed on purpose with an approved deviation, or listed
 as an open question with an owner.
 
+### What a good answer looks like
+
+This is from a trial on the public CardDemo sample (a credit-card system, not claims), with a Claude Sonnet model
+that had never seen it, the skill, and no knowledge pass. The prompt was "What does the job that calculates interest
+do, end to end? Explain its program and build its rule catalogue." Part of the rule catalogue it wrote:
+
+| ID | When | Then | Citation |
+|---|---|---|---|
+| CBACT04C-R03 | The rate record is not found for the account's group (`DISCGRP-STATUS = '23'`) | Retry with group `DEFAULT` | `app/cbl/CBACT04C.cbl:436-446` |
+| CBACT04C-R05 | For each category balance with a non-zero rate | Monthly interest = balance × rate / 1200, added to the account's total | `app/cbl/CBACT04C.cbl:464-467` |
+| CBACT04C-R07 | The account number changes | Add total interest to the balance, zero the cycle credit and debit, rewrite the account | `app/cbl/CBACT04C.cbl:350-356` |
+| CBACT04C-I02 | (implied) | Interest is truncated to 2 decimals, not rounded | `app/cbl/CBACT04C.cbl:464-465` |
+| CBACT04C-I03 | (implied) | The last account in the file is never updated: the end-of-file branch cannot be reached | `app/cbl/CBACT04C.cbl:188-222` |
+
+The last row is a real defect in that program. That is the kind of output to expect: rules in business words, the
+coded condition, the lines to check, and behavior nobody wrote down.
+
 ## 3. Prompts for everyday questions
 
 | You want to know | Ask |

@@ -28,6 +28,8 @@ For resuming work, read [PROJECT-CONTEXT.md](PROJECT-CONTEXT.md).
 | Windows bundle | Met on GitHub's `windows-latest`: builds, sets up, serves cited MCP answers over HTTPS, runs as a service, deletes cleanly | [Windows](evidence/windows.md) |
 | Owner's 10 repositories | 2 COBOL programs of 328 fail to parse, both in BRICKS_TS | [Final validation](evidence/final-validation.md) |
 
+2026-11-22: `deploy/USING.md` and the `legacy-modernize` skill for Copilot CLI were added, and both ship in the Windows bundle. The skill was tried once: a Claude Sonnet model followed it on CardDemo, calling the real MCP server over stdio through a shell wrapper, and produced a system overview, a cited rule catalogue for CBACT04C (including the unreachable end-of-file update) and an impact answer for the account file. It has not been run inside Copilot CLI, and the playbooks for slices, modern-code comparison and translation were not exercised. The Windows bundle with these files has not been built or smoke-tested.
+
 ## Never exercised
 
 - GitHub Copilot in VS Code, and the Copilot coding agent.

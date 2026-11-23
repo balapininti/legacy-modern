@@ -28,7 +28,7 @@ If `programs` is 0, the source hasn't been loaded: `toolkit.cmd discover` then `
 
 ## The notes folder
 
-Write notes as Markdown under `modernization-notes/` in the folder Copilot was started in (ask once if that folder is a place the user wants them; never write inside the toolkit folder or the legacy source). Layout:
+Write notes as Markdown under `modernization-notes/` in the folder Copilot was started in, or the folder the user names (ask once if that folder is a place the user wants them; never write inside the toolkit folder or the legacy source). Layout:
 
 ```
 modernization-notes/
@@ -42,6 +42,34 @@ modernization-notes/
 ```
 
 At the start of a session, read `00-system-overview.md` and `01-slices.md` if they exist and build on them. Templates for every file are in `templates.md` next to this file: read it before writing a note.
+
+## The tools and their arguments
+
+Every result is `{"items":[...],"total_items":n,"next_cursor":...}`. Pass `"cursor":"<next_cursor>"` with the same arguments for the next page.
+
+| Tool | Arguments | Gives |
+|---|---|---|
+| `estate_map` | `area`: `overview` (default), `jobs`, `transactions`, `screens`, `programs`, `data`; `name_prefix` | The names: entry points, programs, data stores, with who reads and writes each store |
+| `inventory_summary` | none | Counts and parse health only |
+| `get_program` | `name`; `include`: any of `callers`, `callees`, `tables`, `maps`, `jcl`, `summary`, `rules`, `data`, `source`, `migration_note`, `modern` | One program's facts. `data` is every field it declares (large): ask for it only when you need the fields |
+| `get_source` | `member`; `line_start`, `line_end` | Exact source lines. Read long members in windows of about 200 lines |
+| `get_copybook` | `name`; `expanded_for` (a program) | A record layout with offsets, lengths and 88-level values |
+| `search` | `query`; `kinds`: `code`, `summary`, `rule`, `dictionary`, `job`, `map`, `modern`; `limit` (up to 100) | Ranked hits. It finds places to look; it is not a complete list |
+| `who_calls`, `calls_from` | `program`; `depth` | Callers / callees, each with member and line |
+| `job_flow` | `job` or `program` (one of them) | Steps in order with datasets in and out |
+| `screen_flow` | `map` or `transaction` (one of them) | Fields and owning programs |
+| `trace_field` | `data_item`; `program`; `direction`: `upstream` or `downstream`; `depth` | Where a field's value comes from or goes |
+| `business_rules` | `program`, `paragraph`, `data_item`, `status` | Stored rules (empty before the knowledge pass) |
+| `table_usage` | `table` | Programs using a **DB2 table**. Not for files |
+| `get_modern_impl`, `gap_report`, `deviations`, `migration_status` | `program` (`scope` for `gap_report`) | The modern side and progress |
+| `explain_feature` | `feature` | How to carry a COBOL feature over to Java |
+| `record_decision`, `record_deviation` | see playbook G | The only tools that write |
+
+Three things the tools don't do directly:
+
+- **Who uses a file or queue** (VSAM, sequential, CICS file): `estate_map {"area":"data","name_prefix":"<name>"}`. It gives the reader and writer counts and the first five names each way. When a count is higher than the names listed, or you need the line, `search` for the file's name in `code` and confirm each program with `get_source`. The same data can have two names: the batch DD name and the CICS file name. Look for both.
+- **Who uses a copybook**: `search {"query":"<COPYBOOK>","kinds":["code"],"limit":100}`, then confirm the `COPY` line in each program you rely on. Say that the list comes from a search and may be incomplete.
+- **Hard-coded copies of a layout**: programs sometimes declare a record's length or fields themselves instead of using the copybook. When a layout matters, read the FD and working-storage of each program that uses the file.
 
 ## Choose the playbook
 
@@ -61,20 +89,20 @@ Finish the playbook you start. If a tool returns `next_cursor`, call it again wi
 
 Goal: a one-page overview a new team member can read in five minutes.
 
-1. `estate_map` (no arguments) for the overview: counts, entry points, and whether the knowledge pass has run.
-2. `estate_map {"area":"jobs"}`, `{"area":"transactions"}`, `{"area":"screens"}`, `{"area":"data"}`. On a large estate use `name_prefix` to take it in parts.
+1. `estate_map` (no arguments) for the overview: counts, whether the knowledge pass has run, and the first jobs and transactions.
+2. `estate_map {"area":"screens"}` and `{"area":"data"}`. Call `{"area":"jobs"}` or `{"area":"transactions"}` only if the overview's `entry_points` shows more in total than it listed. On a large estate use `name_prefix` to take it in parts.
 3. Group what you see by naming pattern (program prefixes, job prefixes, mapsets) and propose what each group is. These are proposals: say so.
-4. Pick up to five entry points that look central (most steps, most programs, most data touched) and run playbook B on each, briefly.
-5. Write `00-system-overview.md` from the template: what the system appears to do, batch entry points, online entry points, data stores with who reads and writes them, the proposed groups, what was not parsed (`parse_status`, `unresolved_dynamic_calls`, missing copybooks) and what that hides.
+4. Pick up to five entry points that look central (most steps, most programs, most data touched). For each, read `get_program` with `["callers","callees","jcl","maps"]` and the program's header comment and main paragraph (the first 150 lines of its PROCEDURE DIVISION), enough to say in two sentences what it does. Say in the overview that these were skimmed, not analysed.
+5. Write `00-system-overview.md` from the template. List the jobs and transactions that run application programs; count utility-only jobs (IDCAMS, SORT, compiles) in one line instead of listing them. Cover: what the system appears to do, batch entry points, online entry points, data stores with who reads and writes them, the proposed groups, what was not parsed (`parse_status`, `unresolved_dynamic_calls`, missing copybooks) and what that hides.
 6. Tell the user what you found in ten lines or fewer, and ask which business names match the groups you proposed.
 
 ## B. Explain one thing
 
 **A program**
-1. `get_program {"name":"X","include":["callers","callees","tables","maps","jcl","data","summary","rules"]}`.
+1. `get_program {"name":"X","include":["callers","callees","tables","maps","jcl","summary","rules"]}`.
 2. If `summary` is `not_available`, that only means the knowledge pass hasn't run. Carry on: you read the code yourself.
-3. `get_source` for the member. For a long program, read the PROCEDURE DIVISION's main paragraph first, then each paragraph it performs, in order. Read all of it before describing it; follow `next_cursor`.
-4. For each file or table it uses: `get_copybook` for the record layout, `table_usage` for who else touches it.
+3. `get_source` for the member, in windows of about 200 lines (`line_start`, `line_end`) from the program's line range. Read the file definitions, then the PROCEDURE DIVISION's main paragraph, then each paragraph it performs, in order. Read all of it before describing it.
+4. For each file or table it uses: `get_copybook` for the record layout; for who else touches it, `table_usage` (DB2 tables) or `estate_map {"area":"data"}` (files and queues).
 5. Write `programs/X.md` from the template: purpose in one sentence; how it is started; inputs and outputs; the processing steps in order with line ranges; every decision that changes the outcome (a rule) with its condition, action and lines; error and abend handling; what it calls and what calls it; suspected defects; questions for an SME.
 
 **A job**: `job_flow {"job":"X"}` gives steps in order with datasets in and out. Explain each step's program with the program steps above (briefly), and show how data moves from step to step.
@@ -106,7 +134,7 @@ A slice is a part of the system that can be understood, migrated and tested by i
 ## E. Dependencies and order
 
 1. For each program in scope: `who_calls` and `calls_from` (depth 3), `get_program include ["tables","jcl","maps"]`.
-2. For each shared table or file: `table_usage`, or the `data` area of `estate_map`, for every reader and writer.
+2. For each shared DB2 table: `table_usage`. For each shared file or queue: `estate_map {"area":"data","name_prefix":"..."}`, then confirm each reader and writer in the code (see "Three things the tools don't do directly"). For each shared copybook: the copybook search there.
 3. For each shared field that crosses programs (COMMAREA, linkage, shared copybook): `trace_field`.
 4. Build the dependency list: *A needs B because ...* with the citation. Three kinds: **calls** (program to program), **data** (one writes what another reads, including job step to job step), **shared code** (copybooks, common subroutines).
 5. Propose the order: shared items that everything needs first, or kept in place behind an interface; then slices with the fewest inbound dependencies; entangled slices last, or together. Say what must move together and why.
