@@ -32,6 +32,7 @@ for n in sys.argv[1:] or ["carddemo", "bankdemo", "bank-of-z", "cbsa", "genapp",
     try:
         r["tools"] = len(m.rpc("tools/list", {})["result"]["tools"])
         e, x = m.tool("inventory_summary"); r["inventory"] = not e
+        e, x = m.tool("estate_map"); r["estate_map"] = None if e else {k: x["items"][0][k] for k in ("jobs", "transactions", "screens")}
         pgm = sql(db, "select d.name from graph_edge e join graph_node d on d.id=e.dst_id where e.type in ('CALLS','LINKS','XCTLS') and exists (select 1 from program p where upper(p.program_id)=d.name) group by 1 order by count(*) desc limit 1") or sql(db, "select program_id from program limit 1")
         if pgm:
             e, x = m.tool("who_calls", program=pgm, depth=2); r["who_calls"] = (pgm, 0 if e else x["total_items"])

@@ -24,9 +24,9 @@ public class FlowTools implements ToolSet {
     @Override
     public List<ToolDef> tools() {
         return List.of(
-                new ToolDef("job_flow", "Steps in order for a job, or the jobs that run a program: PGM, datasets in and out, conditions, restart points, scheduler hints.",
+                new ToolDef("job_flow", "Steps in order for a job, or the jobs that run a program: PGM, datasets in and out, conditions, restart points, scheduler hints. Job names are in estate_map.",
                         schema("\"job\":{\"type\":\"string\"},\"program\":{\"type\":\"string\"}"), false, (a, w) -> jobFlow(a)),
-                new ToolDef("screen_flow", "A BMS map or a transaction: fields, owning programs, and where known validations and next-map transitions.",
+                new ToolDef("screen_flow", "A BMS map or a transaction: fields, owning programs, and where known validations and next-map transitions. Map and transaction names are in estate_map.",
                         schema("\"map\":{\"type\":\"string\"},\"transaction\":{\"type\":\"string\"}"), false, (a, w) -> screenFlow(a)),
                 new ToolDef("trace_field", "Field lineage: MOVE and COMPUTE chain, CALL USING and COMMAREA crossings, file records and table columns read or written.",
                         schema("\"data_item\":{\"type\":\"string\"},\"program\":{\"type\":\"string\"},\"direction\":{\"type\":\"string\",\"enum\":[\"upstream\",\"downstream\"]},\"depth\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":25}", "data_item"), false, (a, w) -> traceField(a)));
@@ -143,7 +143,7 @@ public class FlowTools implements ToolSet {
         List<Map<String, Object>> a = jdbc.queryForList("""
                 SELECT k.id AS artifact_id, k.status, k.content::text AS content FROM knowledge_artifact k
                 WHERE k.kind = 'screen_flow' AND upper(k.content->>'map') = upper(?) AND k.status <> 'rejected' ORDER BY k.status = 'reviewed' DESC, k.id LIMIT 1""", map);
-        return a.isEmpty() ? Map.of("status", "not_available", "reason", "the knowledge pass has not described validations and transitions for this map") : a.get(0);
+        return a.isEmpty() ? Map.of("status", "not_available", "reason", "the knowledge pass has not described validations and transitions for this map; read them in the owning programs with get_source and cite the lines") : a.get(0);
     }
 
     private List<?> traceField(JsonNode a) {

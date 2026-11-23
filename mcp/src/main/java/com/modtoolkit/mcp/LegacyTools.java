@@ -47,10 +47,10 @@ public class LegacyTools {
 
     public List<ToolDef> tools() {
         return List.of(
-                new ToolDef("inventory_summary", "Counts by member type and dialect, parse status, unresolved CALLs and dead-code candidates for the whole estate.", schema(""), false, (a, w) -> inventory()),
+                new ToolDef("inventory_summary", "Counts only, for the whole estate: members by type and dialect, parse status, unresolved CALLs and dead-code candidates. It names nothing: call estate_map for the jobs, transactions, screens, programs and data stores by name.", schema(""), false, (a, w) -> inventory()),
                 new ToolDef("search", "Find code and knowledge. Ranked hits with member, line range, snippet, score and artifact status.",
                         schema("\"query\":{\"type\":\"string\"},\"kinds\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"enum\":[\"code\",\"summary\",\"rule\",\"dictionary\",\"job\",\"map\",\"modern\"]}},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":100}", "query"), false, (a, w) -> search(a)),
-                new ToolDef("get_program", "A program bundle. Ask only for the parts you need through include.",
+                new ToolDef("get_program", "A program bundle. Ask only for the parts you need through include. summary, rules and migration_note come from the knowledge pass and are not_available before it has run: then read the program with include source or get_source and describe it from those lines. Program names are in estate_map.",
                         schema("\"name\":{\"type\":\"string\"},\"include\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"enum\":[\"source\",\"summary\",\"rules\",\"data\",\"callers\",\"callees\",\"tables\",\"maps\",\"jcl\",\"migration_note\",\"modern\"]}}", "name"), false, (a, w) -> getProgram(a)),
                 new ToolDef("get_source", "Exact UTF-8 lines of a member with original and normalized line numbers.",
                         schema("\"member\":{\"type\":\"string\"},\"line_start\":{\"type\":\"integer\",\"minimum\":1},\"line_end\":{\"type\":\"integer\",\"minimum\":1}", "member"), false, (a, w) -> getSource(a)),
@@ -60,7 +60,7 @@ public class LegacyTools {
                         schema("\"program\":{\"type\":\"string\"},\"depth\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":20}", "program"), false, (a, w) -> calls(a, true)),
                 new ToolDef("calls_from", "Programs a program reaches, to a depth, each edge with type, member and line.",
                         schema("\"program\":{\"type\":\"string\"},\"depth\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":20}", "program"), false, (a, w) -> calls(a, false)),
-                new ToolDef("business_rules", "Business rules with condition, action, line range, confidence and review status. Reviewed rules first; rejected ones are not shown unless asked for.",
+                new ToolDef("business_rules", "Business rules with condition, action, line range, confidence and review status. Reviewed rules first; rejected ones are not shown unless asked for. Rules come from the knowledge pass (toolkit knowledge run): an empty result before it has run means no rules were extracted yet, not that the program has none; read the code with get_source and cite the lines instead.",
                         schema("\"program\":{\"type\":\"string\"},\"paragraph\":{\"type\":\"string\"},\"data_item\":{\"type\":\"string\"},\"status\":{\"type\":\"string\",\"enum\":[\"draft\",\"reviewed\",\"rejected\"]}"), false, (a, w) -> businessRules(a)),
                 new ToolDef("table_usage", "Programs touching a DB2 table, grouped by statement type, with member and lines.",
                         schema("\"table\":{\"type\":\"string\"}", "table"), false, (a, w) -> tableUsage(a)));

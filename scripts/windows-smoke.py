@@ -390,8 +390,8 @@ class Smoke:
         sid, init = self.mcp_session(self.token)
         code, r, _ = self.mcp("tools/list", token=self.token, session=sid)
         n = len(r["result"]["tools"])
-        if n != 19:
-            raise AssertionError(f"tools/list returned {n} tools, not 19")
+        if n != 20:
+            raise AssertionError(f"tools/list returned {n} tools, not 20")
         pgm = self.psql("SELECT d.name FROM graph_edge e JOIN graph_node d ON d.id = e.dst_id WHERE e.type IN ('CALLS','LINKS','XCTLS')"
                         " AND EXISTS (SELECT 1 FROM program p WHERE upper(p.program_id) = d.name) GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1")
         err, x = self.tool(self.token, sid, "who_calls", program=pgm, depth=2)
@@ -415,7 +415,7 @@ class Smoke:
         if code401 != 401:
             raise AssertionError(f"initialize without a token answered HTTP {code401}, not 401")
         server = init.get("serverInfo", {}).get("name")
-        return (f"{server}: 19 tools; who_calls {pgm}: {x.get('total_items', len(x['items']))} callers, {cited} citations checked against the"
+        return (f"{server}: 20 tools; who_calls {pgm}: {x.get('total_items', len(x['items']))} callers, {cited} citations checked against the"
                 f" source, e.g. {first['member']}:{first['line']}; 401 without a token")
 
     def ui(self):
@@ -442,7 +442,7 @@ class Smoke:
         self.wait_health()
         n = self.tools_count(self.token)
         members = int(self.psql("SELECT count(*) FROM member"))
-        if n != 19 or members != self.members:
+        if n != 20 or members != self.members:
             raise AssertionError(f"after restart: {n} tools, {members} members (before {self.members})")
         return f"data kept ({members} members); the token from before the restart still opens MCP"
 
@@ -545,7 +545,7 @@ class Smoke:
             if "Started" not in status:
                 raise AssertionError(f"service.cmd status: {status.strip()}")
             n = self.tools_count(self.token)
-            if n != 19:
+            if n != 20:
                 raise AssertionError(f"MCP through the service: {n} tools")
             procs = self.our_processes()
             users = self.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
@@ -561,7 +561,7 @@ class Smoke:
         rc, status = self.service("status")
         if "NonExistent" not in status:
             raise AssertionError(f"after uninstall, status says {status.strip()}")
-        return f"install, start, health, 19 MCP tools ({len(procs)} processes, as {' '.join(users.split())}), stop, uninstall"
+        return f"install, start, health, 20 MCP tools ({len(procs)} processes, as {' '.join(users.split())}), stop, uninstall"
 
     def collect_logs(self):
         dest = self.artifacts / "install-logs"

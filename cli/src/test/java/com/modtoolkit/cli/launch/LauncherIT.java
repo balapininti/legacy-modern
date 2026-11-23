@@ -176,7 +176,7 @@ class LauncherIT {
     void aTokenFromTheLauncherOpensMcpOverTls() throws Exception {
         token = ok("token", "--user", "dev1").last();
         assertThat(token).isNotBlank().doesNotContain(" ");
-        assertThat(mcpTools(token)).isEqualTo(19);
+        assertThat(mcpTools(token)).isEqualTo(20);
     }
 
     @Test
@@ -194,7 +194,7 @@ class LauncherIT {
     @Order(7)
     void startAgainKeepsTheData() throws Exception {
         ok("start");
-        assertThat(mcpTools(token)).as("the token issued before the restart").isEqualTo(19);
+        assertThat(mcpTools(token)).as("the token issued before the restart").isEqualTo(20);
     }
 
     @Test
@@ -210,7 +210,7 @@ class LauncherIT {
         assertThat(home.resolve("data/toolkit.pid")).as("a stale pid file").isRegularFile();
         assertThat(home.resolve("data/pg/postmaster.pid")).as("a stale postmaster.pid").isRegularFile();
         ok("start");
-        assertThat(mcpTools(token)).isEqualTo(19);
+        assertThat(mcpTools(token)).isEqualTo(20);
         ok("stop");
         assertNothingRuns();
     }

@@ -4,13 +4,13 @@ applyTo: "mcp/**"
 
 # MCP tools, prompts and resources
 
-The MCP contract is frozen: 19 tools, 4 prompts, 3 resource templates. Agents at clients depend on the names,
+The MCP contract is frozen: 20 tools, 4 prompts, 3 resource templates. Agents at clients depend on the names,
 argument names and result fields. Add; do not rename or remove.
 
 ## How a tool is built
 
 - A tool is a `ToolDef(name, description, inputSchema, writes, handler)`. Groups implement `ToolSet` as a Spring
-  `@Component` (`FlowTools`, `ModernTools`, `PlanningTools`); `LegacyTools` is exposed by a `ToolSet` bean in
+  `@Component` (`EstateTools`, `FlowTools`, `ModernTools`, `PlanningTools`); `LegacyTools` is exposed by a `ToolSet` bean in
   `ToolkitMcpConfig`. `ToolkitMcpConfig.toolkitTools` registers the union.
 - Input schemas are JSON strings built with `LegacyTools.schema("\"name\":{\"type\":\"string\"}", "name")` (properties,
   then required names).
@@ -51,15 +51,18 @@ Streamable HTTP and stdio, on real CardDemo facts:
 - errors have exactly `code`, `message`, `hint`, with no `Exception`, stack frame or `SELECT`;
 - no token or an unknown token gets 401; `sme-reviewer` gets `FORBIDDEN`; calls on both transports are audited;
 - the 4 prompts and 3 resource templates exist by name, and a hostile prompt argument is sanitized;
+- `estate_map` names the entry points from discovery facts alone (job `CREASTMT` with its programs in step order,
+  transaction `CC00` with `COSGN00C` at `app/csd/CARDDEMO.CSD` line 378), and a bad `area` is a `BAD_ARGUMENT`;
 - stdout of CLI commands holds only command output.
 
-`ServerProfileIT` and `LauncherIT` (cli) assert exactly 19 tools; `scripts/windows-smoke.py` does too.
+`ServerProfileIT` and `LauncherIT` (cli) assert exactly 20 tools; `scripts/windows-smoke.py` does too.
 
 ## Adding a tool (all of these, in one change)
 
-1. A `ToolDef` in the right `ToolSet`, with a description an agent can act on.
+1. A `ToolDef` in the right `ToolSet`, with a description an agent can act on: when to call it, and which tool to
+   call next (`estate_map` and `inventory_summary` show the style).
 2. `ContractTools.EXPECTED` and a provenance assertion in `McpContractIT` on real CardDemo data.
-3. The counts: `ServerProfileIT` (`hasSize(19)`), `LauncherIT` (3 places), `scripts/windows-smoke.py` (3 places).
+3. The counts: `ServerProfileIT` (`hasSize(20)`), `LauncherIT` (3 places), `scripts/windows-smoke.py` (5 places).
 4. `RulebookLint.TOOLS` (rulebook), so generated instructions may name it; the rulebook templates if agents should call it.
 5. `README.md`, `docs/PROJECT-CONTEXT.md` (tool list) and `deploy/INSTALL.md` if it changes what operators see.
 

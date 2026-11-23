@@ -4,7 +4,7 @@ This repository is a rewrite of a COBOL mainframe system in Java ${java} with Sp
 
 ## Before you write any translation
 
-Call the MCP tools first, and trust them over your memory of COBOL:
+Call the MCP tools first, and trust them over your memory of COBOL. If you do not know the name of the program, job, transaction or screen, `estate_map` lists them with member and line.
 
 1. `get_program` for the program, with `include` of `summary`, `rules`, `callers`, `callees`, `tables`, `migration_note`.
 2. `business_rules` for its rules, and `get_copybook` for every record layout it touches.

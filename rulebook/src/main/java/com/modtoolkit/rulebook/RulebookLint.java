@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 /** Checks generated files the way their consumers will read them. */
 public final class RulebookLint {
     /** The frozen contract: a file naming any other tool would send an agent nowhere. */
-    public static final Set<String> TOOLS = Set.of("inventory_summary", "search", "get_program", "get_source", "get_copybook", "who_calls", "calls_from", "trace_field", "job_flow", "business_rules", "screen_flow", "table_usage",
+    public static final Set<String> TOOLS = Set.of("inventory_summary", "estate_map", "search", "get_program", "get_source", "get_copybook", "who_calls", "calls_from", "trace_field", "job_flow", "business_rules", "screen_flow", "table_usage",
             "migration_status", "record_decision", "explain_feature", "get_modern_impl", "gap_report", "deviations", "record_deviation");
     /** Parameter and option names that also appear in backticks. */
     private static final Set<String> NOT_TOOLS = Set.of("expanded_for", "migration_note", "keep_existing", "apply_rule");

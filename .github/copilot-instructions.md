@@ -30,7 +30,7 @@ Java 21, Spring Boot 3.5, Spring AI 1.1 (MCP server), Maven multi-module, packag
 | `knowledge` | LLM pass: versioned prompts, JSON schemas, `ArtifactValidator`, cache, budget, PII redaction, `RecordedLlm` |
 | `rulebook` | Learns the modern repo's conventions; writes `CLAUDE.md` and Copilot instructions there; `RulebookLint` |
 | `verify` | Record codec (COMP-3, zoned, EBCDIC), capture import, Zowe and FTP-JES capture, JUnit test generator |
-| `mcp` | The 19 MCP tools, 4 prompts, 3 resource templates; `ToolRuntime` (roles, paging, errors, audit) |
+| `mcp` | The 20 MCP tools, 4 prompts, 3 resource templates; `ToolRuntime` (roles, paging, errors, audit) |
 | `api` | REST controllers under `/api/**` for the web UI; OpenAPI via springdoc at `/v3/api-docs` |
 | `cli` | `toolkit.jar` (picocli `ToolkitMain`), every command, `ServerTls`, and `cli/launch` (the Windows launcher: `setup`, `start`, `stop`). Most integration tests live here |
 | `ui` | Angular 21 web UI (standalone components, Material, Cytoscape), Playwright e2e |

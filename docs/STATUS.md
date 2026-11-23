@@ -6,6 +6,8 @@ Date: 2026-11-15. Branch `main` at commit 9d16228, pushed to the public reposito
 
 2026-11-15: both workflows pass on `main` at 9d16228. `ci.yml` (Linux): `mvn verify` passes 248 tests with none skipped, all 12 browser tests pass, and the license gate passes on 216 Java dependencies and 22 shipped UI packages. `windows.yml`: pgvector builds, the bundle builds, its smoke test passes 20 of 20 checks, and `mvnw verify` on Windows passes 248 tests, 0 failed, 1 skipped. The zip is published as the pre-release [`v0.1.0-windows-preview1`](https://github.com/balapininti/legacy-modern/releases/tag/v0.1.0-windows-preview1) (213.7 MB; the version is still `0.1.0-SNAPSHOT`).
 
+2026-11-22: a 20th MCP tool, `estate_map`, lists the entry points and the inventory by name (jobs, transactions, screens, programs, data stores) from discovery facts alone, so an agent has somewhere to start before the knowledge pass has run. `McpContractIT` checks it on CardDemo over both transports. On macOS `mvn verify` passes 250 tests with none skipped. Not run for this change: the Windows workflow and the UI browser tests. Not tried: a real agent session that starts from `estate_map`.
+
 For resuming work, read [PROJECT-CONTEXT.md](PROJECT-CONTEXT.md).
 
 ## Acceptance
